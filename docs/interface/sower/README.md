@@ -47,7 +47,9 @@ must provide:
   platform hooks:
 
 - `_write_file` — the create/update strategy: Gitee/GitCode split
-  POST (missing) / PUT (exists, sha required), GitHub always PUTs;
+  POST (missing) / PUT (exists, sha required), GitHub always PUTs; CNB has
+  **no contents write API** — its `_write_file` raises and `push` writes
+  with a real `git push`;
 - `_is_fork_race` — which transient errors `push` retries (e.g. Gitee
   HTTP 400 "文件新建失败", GitHub 409/422).
 
@@ -249,6 +251,93 @@ client = GithubClient(token, repo="my-feed-repo", cdn=custom)  # custom mirror c
 Note that jsDelivr serves **public** repositories only: for a private
 repository keep the default `cdn=False` (the picker then needs an
 authenticated session for the raw host).
+
+## CNB Platform Module
+
+> Source: [cnb.py](../../../src/mycelium/interface/sower/cnb.py)
+
+CNB (cnb.cool) is Tencent Cloud's cloud-native code-hosting platform.
+`CnbClient` mirrors `GiteeClient` for CNB repositories, with three
+platform-shaped differences:
+
+- **Repositories live inside organizations** (组织). CNB has no personal
+  repository concept, so the constructor takes the organization path
+  explicitly (`group`) and creates it when missing. The `namespace`
+  therefore is the organization path, not the profile login — the one
+  deviation from the shared contract, which resolves the namespace from
+  `GET /user` everywhere else (the profile call still runs on first use to
+  validate the token).
+- **No contents write API** — `push` writes with a real `git push`: the
+  module clones the repository into a temporary directory, overwrites the
+  file, commits and pushes (username `cnb`, the access token as the
+  password, handed to git through a temporary credential store that is
+  deleted right after). The `_write_file` contract hook has no HTTP
+  counterpart on CNB and raises.
+- **No fork API** — `fork` mode is accepted (the target name is parsed like
+  on the other platforms) but **always raises** when used, with a hint to
+  fork the repository manually on the CNB web UI.
+
+Its feature set otherwise matches `GiteeClient`:
+
+- **`repo` mode** — manage `<group>/repo`: create it (and the organization
+  when missing) and push into it;
+- the target repository name and visibility are set on creation
+  (`visibility`: `public` / `private` / `secret`);
+- the commit identity written into the feed repository's git history is
+  configurable via `git_author` (`"Name <email>"`), defaulting to a neutral
+  `Mycelium Sower <sower@mycelium.local>` — pick an identity that cannot be
+  linked back to your other platform personas.
+
+Platform quirks: the API authenticates with an `Authorization: Bearer`
+header (like GitHub); a missing file is **HTTP 404** while an empty
+repository answers the contents endpoint with `type: "empty"`; the default
+branch is `main`; and the raw content endpoint requires the token **even
+for public repositories**, so CNB spore links always need an authenticated
+picker session:
+
+```python
+client = CnbClient(token, repo="my-feed-repo", group="mycelium",
+                   visibility="private")
+link = client.spore_link("feed.dat", cfg.vk)   # host: api.cnb.cool
+
+# The picker must attach the token (the raw endpoint requires it).
+class TokenSession(requests.Session):
+    def get(self, url, **kwargs):
+        headers = dict(kwargs.pop("headers", None) or {})
+        headers["Authorization"] = f"Bearer {token}"
+        return super().get(url, headers=headers, **kwargs)
+
+Hypha(session=TokenSession()).pull(link)
+```
+
+Also note: the OpenAPI refuses to delete repositories/organizations inside
+root organizations (HTTP 412, "root group management rules") — `delete_repo`
+propagates that refusal, so cleanup may have to happen on the CNB web UI.
+
+> **To avoid polluting the open-source community, never send pull requests
+> to upstream repositories** — a forked copy is a disguise container, not a
+> contribution.
+
+**Access-token permissions.** Create the token at
+[cnb.cool/profile/token](https://cnb.cool/profile/token) (个人设置 → 访问令牌).
+Set **资源范围 (resource scope) to 全部 (all)** and leave **常见场景
+(common scenarios) unselected**; then tick only the following
+**授权范围 (authorization scopes)** (everything else keeps the platform
+default: public repositories read-only, private ones without permission):
+
+| Scope                        | Why Mycelium needs it                                                                     |
+| ---------------------------- | ----------------------------------------------------------------------------------------- |
+| 只读 `account-profile`       | Resolve/validate the authorized user (`GET /user`, the namespace check)                   |
+| 读写 `repo-code`             | Read code/branches/commits and the **git push** (Git client credentials) — the write path |
+| 读写 `repo-delete`           | Delete repositories (live-test cleanup; often refused for root orgs)                      |
+| 读写 `group-manage`          | Auto-create the organization when it does not exist yet                                   |
+| 读写 `group-resource`        | Create repositories inside the organization                                               |
+| 只读 `repo-basic-info`       | Repository info reads (live tests)                                                        |
+| 读写 `group-delete`          | Delete the organization (live-test cleanup)                                               |
+
+Note: CNB limits root-organization creation to a yearly quota — if
+auto-creation fails with HTTP 429, create the organization once on the web
+UI and pass its path as `group`.
 
 ## Adding a Platform
 

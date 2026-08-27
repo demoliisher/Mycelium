@@ -32,6 +32,13 @@ from mycelium.protocol import Sclerotium, Spore
 # ones here; entries already present are skipped on subsequent runs.
 entries = [
     (
+        "0.2.0",
+        "Add the CNB (cnb.cool) platform module: organization-based "
+        "repositories (auto-created when missing), git-push writes (the "
+        "platform has no contents API), and a documented refusal of fork "
+        "mode (no fork API on CNB)",
+    ),
+    (
         "0.1.0",
         "Add the one-command pre-submit gate (scripts/gate.py, check and "
         "auto-fix); move mdtables.py out of the package into scripts/; fold "

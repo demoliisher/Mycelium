@@ -29,7 +29,7 @@ class Storage(ABC):
 - 从 API 资料（`GET /user`）解析命名空间；
 - 生命周期方法（`ensure_repo_exists`、`create_repo`、`fork_repo`、`delete_repo`、`wait_ready`）、低层 `_request`、fork 源解析 `_split_fork`、blob sha 查询 `_existing_sha`，以及两个平台钩子：
 
-- `_write_file` — 创建/更新策略：Gitee/GitCode 拆分 POST（缺失）/ PUT（已存在，需 sha），GitHub 一律 PUT；
+- `_write_file` — 创建/更新策略：Gitee/GitCode 拆分 POST（缺失）/ PUT（已存在，需 sha），GitHub 一律 PUT；CNB **没有** contents 写入 API——它的 `_write_file` 直接抛错，`push` 用真实的 `git push` 写入；
 - `_is_fork_race` — `push` 重试哪些瞬时错误（如 Gitee HTTP 400「文件新建失败」、GitHub 409/422）。
 
 令牌的附加方式是 `_request` 的实现细节（Gitee/GitCode 用查询参数，GitHub 用 `Authorization: Bearer`）；建仓请求体的额外字段（如 Gitee 的 `can_comment`）与复刻的防御性改名（Gitee/GitCode）则在平台自身的 `create_repo` / `fork_repo` 内部实现。
@@ -158,6 +158,57 @@ client = GithubClient(token, repo="my-feed-repo", cdn=custom)  # 自定义镜像
 ```
 
 注意 jsDelivr 只加速**公开**仓库：私有仓库保持默认 `cdn=False`（采摘者需用带认证的会话访问 raw host）。
+
+## CNB 平台模块 CNB Platform Module
+
+> 源码：[cnb.py](../../../src/mycelium/interface/sower/cnb.py)
+
+CNB（cnb.cool）是腾讯云的云原生代码托管平台。`CnbClient` 为 CNB 仓库复刻了 `GiteeClient`，有三个平台性差异：
+
+- **仓库只能存在于「组织」下**（组织）。CNB 没有个人仓库概念，因此构造函数需要显式传入组织路径（`group`），缺失时自动创建。`namespace` 因此是组织路径而非资料登录名——这是对共享契约的唯一偏离（其他平台都从 `GET /user` 解析命名空间；首次使用仍会调用资料接口以尽早校验令牌）。
+- **没有 contents 写入 API** —— `push` 用真实的 `git push` 写入：模块把仓库克隆到临时目录，覆写文件后提交并推送（用户名为 `cnb`，访问令牌作密码，经临时凭据存储文件交给 git，用完即删）。契约钩子 `_write_file` 在 CNB 上没有对应的 HTTP 端点，直接抛错。
+- **没有 fork API** —— `fork` 模式仍可传入（目标名与其他平台一样解析），但**一旦使用必然抛错**，并提示到 CNB 网页手动 fork。
+
+其余功能与 `GiteeClient` 对齐：
+
+- **`repo` 模式** — 管理 `<group>/repo`：缺失时创建（组织缺失则一并创建）并推送；
+- 创建时设置仓库名与可见性（`visibility`：`public` / `private` / `secret`）；
+- 写入订阅源仓库 git 历史的提交身份可用 `git_author`（`"Name <email>"`）配置，默认为中性的 `Mycelium Sower <sower@mycelium.local>`——请选择无法与你其他平台身份关联的身份。
+
+平台差异：API 通过 `Authorization: Bearer` 请求头认证（与 GitHub 相同）；缺失文件返回 **HTTP 404**，而空仓库的 contents 端点返回 `type: "empty"`；默认分支为 `main`；raw 内容端点**即使对公开仓库也要求令牌**，因此 CNB 的孢子链接始终需要带认证的采摘者会话：
+
+```python
+client = CnbClient(token, repo="my-feed-repo", group="mycelium",
+                   visibility="private")
+link = client.spore_link("feed.dat", cfg.vk)   # host: api.cnb.cool
+
+# 采摘者必须携带令牌（raw 端点要求认证）。
+class TokenSession(requests.Session):
+    def get(self, url, **kwargs):
+        headers = dict(kwargs.pop("headers", None) or {})
+        headers["Authorization"] = f"Bearer {token}"
+        return super().get(url, headers=headers, **kwargs)
+
+Hypha(session=TokenSession()).pull(link)
+```
+
+另请注意：OpenAPI 会拒绝删除根组织下的仓库/组织（HTTP 412「root group management rules」）——`delete_repo` 会如实抛出该拒绝，必要时清理需在 CNB 网页上进行。
+
+> **为避免污染开源社区，请勿向上游仓库提交 PR**——复刻副本是伪装容器，不是贡献。
+
+**令牌权限配置。** 在 [cnb.cool/profile/token](https://cnb.cool/profile/token)（个人设置 → 访问令牌）创建。**资源范围选「全部」**，**常见场景不选**；然后在**授权范围**中只勾选下表所列项（其余保持平台默认：公开仓库默认只读、私有默认无权限）：
+
+| 授权范围                | Mycelium 的用途                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------- |
+| 只读 `account-profile`  | 解析/校验授权用户（`GET /user`，命名空间校验）                                  |
+| 读写 `repo-code`        | 读取代码/分支/commit 与 **git push**（Git 客户端凭据）——写入路径                |
+| 读写 `repo-delete`      | 删除仓库（live 测试清理；对根组织常被平台拒绝）                                 |
+| 读写 `group-manage`     | 组织缺失时自动创建组织                                                          |
+| 读写 `group-resource`   | 在组织下创建仓库                                                                |
+| 只读 `repo-basic-info`  | 仓库信息读取（live 测试）                                                       |
+| 读写 `group-delete`     | 删除组织（live 测试清理）                                                       |
+
+注意：CNB 对根组织的创建有年度配额——若自动创建报 HTTP 429，请先在网页创建一次组织，再把其路径作为 `group` 传入。
 
 ## 添加平台 Adding a Platform
 

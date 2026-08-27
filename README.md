@@ -105,6 +105,7 @@ platform clients:
 - [gitee](src/mycelium/interface/sower/gitee.py) — `GiteeClient`: Gitee OpenAPI v5 publisher (repo/fork management + contents API, `master` branch, async-fork retry).
 - [gitcode](src/mycelium/interface/sower/gitcode.py) — `GitCodeClient`: GitCode/AtomGit publisher — one platform under two domains, shared API v5 endpoint.
 - [github](src/mycelium/interface/sower/github.py) — `GithubClient`: GitHub REST publisher — Bearer auth, single PUT contents endpoint, optional jsDelivr CDN acceleration.
+- [cnb](src/mycelium/interface/sower/cnb.py) — `CnbClient`: CNB (cnb.cool) publisher — organization-based repositories, git-push writes (no contents API), no fork API.
 - [crypto](src/mycelium/crypto/) — deterministic cryptography: SHA-2/SHA-3 family wrappers, Ed25519, AES-256-GCM, and the `Config` key bundle.
 - [mdtables](scripts/mdtables.py) — CJK-aware GFM table alignment checker/fixer (`python scripts/mdtables.py [--fix]`).
 - [gate](scripts/gate.py) — one-command pre-submit gate: checks and auto-fixes code style (ruff), tests (pytest), markdown lint (mdlint) and table alignment (mdtables).
@@ -148,6 +149,10 @@ mycelium://8pFEkFBqrQWgw6IzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPw
 
 ## Changelog
 
+- **0.2.0** — Add the CNB (cnb.cool) platform module: organization-based
+  repositories (auto-created when missing), git-push writes (the platform
+  has no contents API), and a documented refusal of `fork` mode (no fork
+  API on CNB).
 - **0.1.0** — Add the one-command pre-submit gate (`scripts/gate.py`, check + auto-fix); move `mdtables.py` out of the package into `scripts/`; fold table alignment into the markdown lint task.
 - **0.0.1** — Initial release: encrypted-feed distribution protocol with
   deterministic crypto, protobuf wire format and spore links; sower/picker

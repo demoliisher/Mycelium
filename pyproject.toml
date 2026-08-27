@@ -1,6 +1,6 @@
 [project]
 name = "mycelium"
-version = "0.1.0"
+version = "0.2.0"
 description = "A realization of distribution of encrypted feeds."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.12"
