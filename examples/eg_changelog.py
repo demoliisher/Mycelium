@@ -32,6 +32,12 @@ from mycelium.protocol import Sclerotium, Spore
 # ones here; entries already present are skipped on subsequent runs.
 entries = [
     (
+        "0.1.0",
+        "Add the one-command pre-submit gate (scripts/gate.py, check and "
+        "auto-fix); move mdtables.py out of the package into scripts/; fold "
+        "table alignment into the markdown lint task",
+    ),
+    (
         "0.0.1",
         "Initial release — encrypted-feed distribution protocol with deterministic "
         "crypto, protobuf wire format and spore links; sower/picker role split "

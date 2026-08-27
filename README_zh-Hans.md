@@ -54,7 +54,8 @@ Mycelium 以 [MIT 许可证](LICENSE) 发布。欢迎其他开发者在遵循许
 - [gitcode](src/mycelium/interface/sower/gitcode.py) —— `GitCodeClient`：GitCode/AtomGit 发布端——同一平台两个域名，共享 API v5 端点。
 - [github](src/mycelium/interface/sower/github.py) —— `GithubClient`：GitHub REST 发布端——Bearer 鉴权、单一 PUT contents 端点、可选 jsDelivr CDN 加速。
 - [crypto](src/mycelium/crypto/) —— 确定性密码学：SHA-2/SHA-3 全系列封装、Ed25519、AES-256-GCM 与 `Config` 密钥束。
-- [mdtables](src/mycelium/utils/mdtables.py) —— 感知 CJK 宽度的 GFM 表格对齐检查/修复工具（`python -m mycelium.utils.mdtables [--fix]`）。
+- [mdtables](scripts/mdtables.py) —— 感知 CJK 宽度的 GFM 表格对齐检查/修复工具（`python scripts/mdtables.py [--fix]`）。
+- [gate](scripts/gate.py) —— 一条命令跑完提交前全部检查并自动修复：代码风格（ruff）、测试（pytest）、Markdown 检查（mdlint）与表格对齐（mdtables）。
 
 ## 快速开始
 
@@ -88,6 +89,7 @@ mycelium://8pFEkFBqrQWgw6IzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPw
 
 ## 更新日志
 
+- **0.1.0**——新增一条命令的提交前门禁（`scripts/gate.py`，检查并自动修复）；`mdtables.py` 移出包外至 `scripts/`；表格对齐并入 Markdown 检查任务。
 - **0.0.1**——初始版本：加密订阅源分发协议，含确定性加密、protobuf 线格式与孢子链接；播种者/采摘者角色分离，支持 Gitee、GitCode 与 GitHub；采用菌丝体生态命名。
 
 更新日志条目维护在 `examples/eg_changelog.py` 中；运行它可重新生成随仓库提交的示例文件 `examples/ChangeLog.dat`。

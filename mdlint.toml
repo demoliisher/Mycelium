@@ -16,10 +16,10 @@
 # markdownlint-rs's MD060 compares the configured style string against
 # per-column alignment values parsed from ':' markers in the delimiter row
 # and never matches "aligned", so the style cannot be satisfied. Instead,
-# `mycelium.utils.mdtables` checks/realigns tables (CJK-width aware):
+# `scripts/mdtables.py` checks/realigns tables (CJK-width aware):
 #
-#     uv run python -m mycelium.utils.mdtables           # check (CI)
-#     uv run python -m mycelium.utils.mdtables --fix     # realign in place
+#     uv run python scripts/mdtables.py                 # check (CI)
+#     uv run python scripts/mdtables.py --fix           # realign in place
 #
 # fix = false  never auto-modify files during `uv run mdlint check`
 #

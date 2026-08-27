@@ -7,15 +7,15 @@ The bundled markdownlint-rs (``mdlint``) cannot enforce the ``aligned``
 table style — its MD060 compares the configured style string against
 per-column alignment values parsed from ``:`` markers in the delimiter row
 (``center``/``right``/``left``/``default``), so ``aligned`` never matches
-any table. This module provides the check instead: every GFM table in the
+any table. This script provides the check instead: every GFM table in the
 scanned markdown files must have its pipe characters vertically aligned by
 *visual* width (CJK and full-width characters count as two columns).
 
 Usage:
 
-    python -m mycelium.utils.mdtables                 # check; exit 1 on any misaligned table
-    python -m mycelium.utils.mdtables --fix           # realign tables in place
-    python -m mycelium.utils.mdtables path/to/*.md    # scan specific files/dirs
+    python scripts/mdtables.py                  # check; exit 1 on any misaligned table
+    python scripts/mdtables.py --fix            # realign tables in place
+    python scripts/mdtables.py path/to/*.md     # scan specific files/dirs
 
 The default scan covers every ``*.md`` under the current directory except
 tool and artifact directories (``.venv``, ``.git``, ``.pytest_cache``,
@@ -283,7 +283,7 @@ def fix_text(text: str) -> tuple[int, str]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="python -m mycelium.utils.mdtables",
+        prog="python scripts/mdtables.py",
         description=(
             "Check or realign GFM tables in markdown files "
             "(the MD060 'aligned' style, CJK-width aware)."
@@ -319,7 +319,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.fix and issues:
         print(
             f"\n{issues} misaligned table(s); "
-            "run 'python -m mycelium.utils.mdtables --fix' to realign"
+            "run 'python scripts/mdtables.py --fix' to realign"
         )
         return 1
     return 0

@@ -98,21 +98,22 @@ the English original.
 
 Every documentation change must pass:
 
-1. **`uv run mdlint check --config mdlint.toml .`** — markdownlint-rs with the
-   repository config. Two notes on that config: MD033 (inline HTML) and
-   MD030 (list marker spacing) are **intentionally disabled** (MD030
-   because markdownlint-rs mis-parses line-leading `**` as a `*` list
-   marker — do not work around rules by rewriting prose; line-leading
-   bold is written as `**...**`; inline HTML is allowed for any advanced
-   feature that needs it, not only tables — the GitCode permission table
-   is one example: an HTML table with a rowspan-merged level column and
-   colored read/write/forbid recommendations). MD013 (line length) is
-   **disabled entirely**: prose
-   is written as natural long lines, because wrapping (especially CJK)
-   text to a fixed width inserts spurious spaces when rendered.
-2. **`python -m mycelium.utils.mdtables`** — GFM table column alignment
-   (the MD060 "aligned" style, CJK-width aware). After editing any table,
-   run `uv run python -m mycelium.utils.mdtables --fix` to realign in place, then
+1. **Markdown lint, in two commands** — first
+   `uv run mdlint check --config mdlint.toml .` (markdownlint-rs with the
+   repository config), then `uv run python scripts/mdtables.py` (GFM table
+   column alignment, the MD060 "aligned" style, CJK-width aware). Two notes
+   on the markdownlint-rs config: MD033 (inline HTML) and MD030 (list
+   marker spacing) are **intentionally disabled** (MD030 because
+   markdownlint-rs mis-parses line-leading `**` as a `*` list marker — do
+   not work around rules by rewriting prose; line-leading bold is written
+   as `**...**`; inline HTML is allowed for any advanced feature that needs
+   it, not only tables — the GitCode permission table is one example: an
+   HTML table with a rowspan-merged level column and colored
+   read/write/forbid recommendations). MD013 (line length) is **disabled
+   entirely**: prose is written as natural long lines, because wrapping
+   (especially CJK) text to a fixed width inserts spurious spaces when
+   rendered. After editing any table, run
+   `uv run python scripts/mdtables.py --fix` to realign in place, then
    re-check.
 
 Writing conventions:
@@ -141,11 +142,10 @@ Writing conventions:
 
 ## Before submitting
 
-Run the full gate:
+Run the full gate with one command — it checks and auto-fixes code style
+(ruff), tests (pytest), markdown lint (mdlint) and table alignment
+(mdtables):
 
-| Check                                  | Command                                          |
-| -------------------------------------- | ------------------------------------------------ |
-| Code style                             | `uv run ruff check .`                            |
-| Tests                                  | `uv run pytest`                                  |
-| Markdown lint                          | `uv run mdlint check --config mdlint.toml .`     |
-| Table alignment                        | `uv run python -m mycelium.utils.mdtables`       |
+| Check           | Command                         |
+| --------------- | ------------------------------- |
+| Full gate       | `uv run python scripts/gate.py` |

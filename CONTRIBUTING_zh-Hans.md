@@ -59,8 +59,7 @@
 
 每次文档改动必须通过：
 
-1. **`uv run mdlint check --config mdlint.toml .`** —— markdownlint-rs 按仓库配置检查。配置有两点说明：MD033（内联 HTML）与 MD030（列表标记间距）是**有意禁用**的（MD030 因为 markdownlint-rs 把行首 `**` 误解析为 `*` 列表标记——不要为了绕开规则改写正文：行首加粗就用 `**...**`，内联 HTML 可用于任何需要 HTML 实现的高级功能，不限于表格——GitCode 权限表（HTML 表格，rowspan 合并的级别列、彩色读写禁推荐）只是其中一例）；MD013（行长）**完全禁用**——正文按自然长行书写，因为把（尤其中文）文本折行到固定宽度，渲染时会多出额外空格。
-2. **`uv run python -m mycelium.utils.mdtables`** —— GFM 表格列对齐检查（即 MD060 `aligned` 样式，感知 CJK 双宽）。改过任何表格后，先运行 `uv run python -m mycelium.utils.mdtables --fix` 就地重新对齐，再检查。
+1. **Markdown 检查，含两条指令** —— 先运行 `uv run mdlint check --config mdlint.toml .`（markdownlint-rs 按仓库配置检查），再运行 `uv run python scripts/mdtables.py`（GFM 表格列对齐检查，即 MD060 `aligned` 样式，感知 CJK 双宽）。markdownlint-rs 配置有两点说明：MD033（内联 HTML）与 MD030（列表标记间距）是**有意禁用**的（MD030 因为 markdownlint-rs 把行首 `**` 误解析为 `*` 列表标记——不要为了绕开规则改写正文：行首加粗就用 `**...**`，内联 HTML 可用于任何需要 HTML 实现的高级功能，不限于表格——GitCode 权限表（HTML 表格，rowspan 合并的级别列、彩色读写禁推荐）只是其中一例）；MD013（行长）**完全禁用**——正文按自然长行书写，因为把（尤其中文）文本折行到固定宽度，渲染时会多出额外空格。改过任何表格后，先运行 `uv run python scripts/mdtables.py --fix` 就地重新对齐，再检查。
 
 写作约定：
 
@@ -78,11 +77,8 @@
 
 ## 提交前检查
 
-完整把关清单：
+一条命令跑完全部把关并自动修复（代码风格、测试、Markdown 检查、表格对齐）：
 
-| 检查项        | 命令                                                  |
-| ------------- | ----------------------------------------------------- |
-| 代码风格      | `uv run ruff check .`                                 |
-| 测试          | `uv run pytest`                                       |
-| Markdown 检查 | `uv run mdlint check --config mdlint.toml .`          |
-| 表格对齐      | `uv run python -m mycelium.utils.mdtables`            |
+| 检查项        | 命令                              |
+| ------------- | --------------------------------- |
+| 完整门禁      | `uv run python scripts/gate.py`   |

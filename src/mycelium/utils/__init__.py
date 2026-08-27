@@ -10,12 +10,12 @@ Utility package: shared low-level helpers.
   regex, but decoding it as Base64 yields garbage.
 - ``typetools``: timestamp and minimal big-endian integer serialization
   used by the protocol payloads.
-- ``mdtables``: dev tool — checks/realigns GFM tables in markdown files
-  (the MD060 "aligned" style, CJK-width aware; ``mdlint`` cannot enforce it).
+
+Project scripts (e.g. the GFM table alignment tool) live in ``scripts/``
+at the repository root, outside the package.
 """
 
 __all__ = [
     "base58",
     "typetools",
-    "mdtables",
 ]

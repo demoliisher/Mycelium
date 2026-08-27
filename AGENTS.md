@@ -27,13 +27,14 @@ verification key embedded in the link.
 
 ## Repository layout
 
-| Path                               | Purpose                                                                                                                                                       |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/mycelium/`                    | Source package (`crypto`, `protocol`, `interface`, `utils`)                                                                                                   |
-| `src/mycelium/protocol/feed.proto` | Protobuf source of truth; `feed_pb.py` is generated next to it                                                                                                |
-| `docs/`                            | Module docs mirroring the package layout (English + optional `_zh-Hans.md` translations)                                                                      |
-| `tests/`                           | Unit tests mirroring the package layout; live platform tests in `tests/interface/`                                                                            |
-| `examples/`                        | Runnable end-to-end examples (`eg_publish.py`, `eg_subscribe.py`, `eg_changelog.py`); the generated changelog feed `ChangeLog.dat` is committed as an example |
+| Path                               | Purpose                                                                                                                                                        |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/mycelium/`                    | Source package (`crypto`, `protocol`, `interface`, `utils`)                                                                                                    |
+| `src/mycelium/protocol/feed.proto` | Protobuf source of truth; `feed_pb.py` is generated next to it                                                                                                 |
+| `docs/`                            | Module docs mirroring the package layout (English + optional `_zh-Hans.md` translations)                                                                       |
+| `tests/`                           | Unit tests mirroring the package layout; live platform tests in `tests/interface/`                                                                             |
+| `examples/`                        | Runnable end-to-end examples (`eg_publish.py`, `eg_subscribe.py`, `eg_changelog.py`); the generated changelog feed `ChangeLog.dat` is committed as an example  |
+| `scripts/`                         | Project scripts outside the package (`gate.py`, the one-command check-and-fix pre-submit gate; `mdtables.py`, the CJK-aware GFM table alignment checker/fixer) |
 
 ## Commands
 
@@ -42,15 +43,15 @@ resolves the tool from the project environment and syncs it first if
 needed — no activated venv required. Run them from the repository root.
 Requires Python ≥ 3.12.
 
-| Task                       | Command                                          |
-| -------------------------- | ------------------------------------------------ |
-| Install deps + dev tooling | `uv sync`                                        |
-| Lint (zero warnings)       | `uv run ruff check .`                            |
-| Run unit tests             | `uv run pytest`                                  |
-| Lint Markdown              | `uv run mdlint check --config mdlint.toml .`     |
-| Check table alignment      | `uv run python -m mycelium.utils.mdtables`       |
-| Realign tables in place    | `uv run python -m mycelium.utils.mdtables --fix` |
-| Regenerate protobuf        | `uv run buf generate`                            |
+| Task                       | Command                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| Install deps + dev tooling | `uv sync`                                                                         |
+| Lint (zero warnings)       | `uv run ruff check .`                                                             |
+| Run unit tests             | `uv run pytest`                                                                   |
+| Lint Markdown              | `uv run mdlint check --config mdlint.toml . && uv run python scripts/mdtables.py` |
+| Realign tables in place    | `uv run python scripts/mdtables.py --fix`                                         |
+| Regenerate protobuf        | `uv run buf generate`                                                             |
+| Full gate (all checks)     | `uv run python scripts/gate.py`                                                   |
 
 ## Architecture
 
@@ -78,8 +79,9 @@ platform module `sower/gitee.py`, `sower/gitcode.py`,
 picker is pull-only (`picker/hypha.py`). The namespace is always
 taken from `GET /user`; access tokens arrive only via runtime arguments.
 
-**`mycelium.utils`** — Base58, the `fake64` serialization, `mdtables`
-(CJK-aware GFM table alignment), and misc type helpers.
+**`mycelium.utils`** — Base58, the `fake64` serialization, and misc type
+helpers. Project scripts (e.g. `scripts/mdtables.py`, the CJK-aware GFM
+table alignment tool) live outside the package.
 
 ## Non-negotiables
 
@@ -116,7 +118,7 @@ taken from `GET /user`; access tokens arrive only via runtime arguments.
   leading bold) are intentionally disabled — write natural long lines,
   `**...**` at line start, and inline HTML for any advanced feature that
   needs it; never wrap prose to a fixed width. Tables must be GFM-aligned —
-  run `uv run python -m mycelium.utils.mdtables` after editing one. Chinese
+  run `uv run python scripts/mdtables.py` after editing one. Chinese
   docs use corner quotes 「」 (『』 for nesting).
 - Release workflow: semantic versioning + Conventional Commits; changelog
   updates (`examples/eg_changelog.py` entries + the README "Changelog"
@@ -142,8 +144,10 @@ taken from `GET /user`; access tokens arrive only via runtime arguments.
   **by the author only**. Agents must never read, edit, lint, diff or review
   its content: its wording can trip LLM content-safety mechanisms
   (especially Chinese domestic LLMs). When `git status` shows it modified,
-  do not inspect it — silently append "updated the classical Chinese README"
-  to the next commit message.
+  do not inspect it, and never mention it in the next commit's **title**
+  (at most a brief note in the commit body). The pre-submit gate
+  (`scripts/gate.py`) checks it but restores it afterwards — it is never
+  auto-fixed.
 - Sower-identity separation: audit each push — commit authorship and
   history content. Identifiers tied to platforms in regions with stronger
   censorship must never surface on platforms in regions with weaker
@@ -186,14 +190,12 @@ taken from `GET /user`; access tokens arrive only via runtime arguments.
 
 ## Before submitting
 
-Run the full gate (also documented in `CONTRIBUTING.md`):
+Run the full gate — one command checks and auto-fixes code style, tests,
+markdown lint and table alignment (also documented in `CONTRIBUTING.md`):
 
-| Check           | Command                                        |
-| --------------- | ---------------------------------------------- |
-| Code style      | `uv run ruff check .`                          |
-| Tests           | `uv run pytest`                                |
-| Markdown lint   | `uv run mdlint check --config mdlint.toml .`   |
-| Table alignment | `uv run python -m mycelium.utils.mdtables`     |
+| Check           | Command                         |
+| --------------- | ------------------------------- |
+| Full gate       | `uv run python scripts/gate.py` |
 
 When in doubt, read `CONTRIBUTING.md` and the module docs under `docs/`
 before changing code.

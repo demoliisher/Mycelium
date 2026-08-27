@@ -1,12 +1,27 @@
 """
-Tests for the markdown table alignment tool (mycelium.utils.mdtables):
+Tests for the markdown table alignment tool (``scripts/mdtables.py``):
 
-the MD060 "aligned" style check/realign, CJK-width aware.
+the MD060 "aligned" style check/realign, CJK-width aware. The tool is a
+standalone project script (not part of the ``mycelium`` package), so the
+tests load it from ``scripts/`` by path.
 """
 
+import importlib.util
+import sys
 import unittest
+from pathlib import Path
 
-from mycelium.utils.mdtables import check_text, fix_text, visual_width
+_SPEC = importlib.util.spec_from_file_location(
+    "mdtables", Path(__file__).resolve().parents[2] / "scripts" / "mdtables.py"
+)
+_mdtables = importlib.util.module_from_spec(_SPEC)
+assert _SPEC.loader is not None
+sys.modules["mdtables"] = _mdtables
+_SPEC.loader.exec_module(_mdtables)
+
+check_text = _mdtables.check_text
+fix_text = _mdtables.fix_text
+visual_width = _mdtables.visual_width
 
 
 class TestVisualWidth(unittest.TestCase):
