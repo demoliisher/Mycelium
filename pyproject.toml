@@ -1,0 +1,37 @@
+[project]
+name = "mycelium"
+version = "0.0.1"
+description = "A realization of distribution of encrypted feeds."
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.12"
+license = "MIT"
+authors = [{ name = "demoliisher", email = "txpbyy@proton.me" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "protobuf-py>=0.2.0",
+    "pycryptodome>=3.23.0",
+    "requests>=2.34.2",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mycelium*"]
+
+[dependency-groups]
+dev = [
+    "buf-bin>=1.72.0",
+    "markdownlint-rs>=0.3.23",
+    "protoc-gen-py>=0.2.0",
+    "pytest>=9.1.1",
+    "ruff>=0.15.22",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

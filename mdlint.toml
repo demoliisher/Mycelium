@@ -1,0 +1,43 @@
+# Mycelium markdownlint-rs (mdlint) configuration.
+#
+# Rule exceptions:
+# - MD033 (inline HTML) — disabled: inline HTML is allowed for any advanced
+#   feature that needs it, not only tables — e.g. the GitCode permission
+#   table deliberately uses an HTML table (rowspan-merged level column,
+#   colored read/write/forbid recommendations).
+# - MD030 (list marker spacing) — markdownlint-rs mis-parses a line starting
+#   with `**` as a `*` list marker and falsely reports "Expected 1 space(s)
+#   after list marker, found 0", so line-leading bold is disabled instead.
+# - MD013 (line length) — disabled entirely: prose is written as natural
+#   long lines, because wrapping (especially CJK) text to a fixed width
+#   inserts spurious spaces when rendered.
+#
+# Table alignment (the MD060 "aligned" style) is NOT enforced here:
+# markdownlint-rs's MD060 compares the configured style string against
+# per-column alignment values parsed from ':' markers in the delimiter row
+# and never matches "aligned", so the style cannot be satisfied. Instead,
+# `mycelium.utils.mdtables` checks/realigns tables (CJK-width aware):
+#
+#     uv run python -m mycelium.utils.mdtables           # check (CI)
+#     uv run python -m mycelium.utils.mdtables --fix     # realign in place
+#
+# fix = false  never auto-modify files during `uv run mdlint check`
+#
+# All documentation lives under `docs/` (bilingual: `README.md` +
+# `README_zh-Hans.md`, both committed). `uv run mdlint check --config
+# mdlint.toml .` covers every Markdown file in the repository.
+
+fix = false
+
+[rules.MD033]
+enabled = false
+
+# MD030: markdownlint-rs treats `**` at line start as a `*` list marker and
+# flags every line-leading bold as a spacing violation — disabled rather than
+# reworking the docs.
+[rules.MD030]
+enabled = false
+
+# MD013: no line-length limit — see the header comment.
+[rules.MD013]
+enabled = false

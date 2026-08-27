@@ -1,0 +1,9 @@
+version: v2
+inputs:
+  - directory: src/mycelium/protocol
+plugins:
+  - local: protoc-gen-py
+    # Generate into the protocol package, next to the .proto, keeping the
+    # `<name>_pb.py` naming; import it as `import feed_pb as pb`.
+    out: src/mycelium/protocol
+    opt: init_files=false

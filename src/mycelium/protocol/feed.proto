@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package Mycelium.v1;
+
+// A single feed entry — one fruit the sclerotium bears.
+message Fruit {
+    bytes time = 1;
+    bytes edition = 2;
+    bytes content = 3;
+    bytes guid = 4;
+    bytes sign = 5;
+}
+
+// The feed message — the sclerotium: metadata plus the fruits it bears.
+message Sclerotium {
+    bytes time = 1;
+    bytes edition = 2;
+    bytes content = 3;
+    bytes sign = 4;
+    repeated Fruit fruits = 5;
+}
