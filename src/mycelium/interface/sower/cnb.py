@@ -9,11 +9,18 @@ module:
 
 - **Repositories live inside organizations** (组织). CNB has no personal
   repository concept, so the constructor takes the organization path
-  explicitly (``group``) and creates it when missing (needs the
-  ``group-manage`` token scope). The ``namespace`` therefore is the
-  organization path, not the profile login — the one deviation from the
-  shared ``GitPlatformClient`` contract, which resolves the namespace from
-  ``GET /user`` everywhere else.
+  (``group``) and creates it when missing (needs the ``group-manage``
+  token scope). When ``group`` is omitted the organization is resolved
+  from the authorized user's profile: the username-named organization
+  when it already exists, else an existing organization with no
+  repositories yet (reused instead of creating a new one — listed via
+  ``GET /user/groups``, which needs the ``account-engage`` scope; without
+  that scope the search is skipped), else a username-named organization is
+  auto-created. The ``namespace`` therefore is the organization path, not
+  the profile login — the one deviation from the shared
+  ``GitPlatformClient`` contract, which resolves the namespace from
+  ``GET /user`` everywhere else (CNB still calls ``GET /user``: to
+  validate the token early and, without ``group``, to learn the username).
 - **There is no contents write API.** ``push`` writes the blob with a real
   ``git push``: the module clones the repository into a temporary directory,
   overwrites the file, commits and pushes (username ``cnb``, the access
@@ -90,14 +97,20 @@ class CnbClient(GitPlatformClient):
 
     - ``repo`` mode: the target is ``<group>/repo`` — the repository is
       created when missing and the organization ``group`` is created too when
-      it does not exist yet (CNB repositories live inside organizations);
+      it does not exist yet (CNB repositories live inside organizations).
+      ``group`` is optional: when omitted, the organization is resolved from
+      the authorized user's profile — the username-named organization when it
+      exists, else an existing organization with no repositories yet
+      (reused), else a username-named organization is auto-created (see
+      ``_resolve_group``);
     - ``fork`` mode: accepted for API compatibility but **always raises**
       when used — CNB has no fork-creation endpoint; fork the repository
       manually on the CNB web UI and then use ``repo`` mode.
 
-    ``namespace`` is the organization path ``group`` (CNB has no personal
-    repositories); the profile call (``GET /user``) still runs on first use
-    to validate the token early.
+    ``namespace`` is the organization path — ``group``, or (when omitted)
+    the organization resolved from the profile username (CNB has no
+    personal repositories); the profile call (``GET /user``) still runs on
+    first use to validate the token early.
 
     ``visibility`` selects the repository visibility on creation
     (``public`` / ``private`` / ``secret``; CNB defaults to ``public``).
@@ -140,11 +153,9 @@ class CnbClient(GitPlatformClient):
         else:
             assert repo is not None
             self.repo = repo
-            if not group:
-                raise ValueError(
-                    "CNB repositories live inside organizations: pass the "
-                    "organization path (group=...); it is created when missing"
-                )
+            # group is optional: when omitted it is derived from the profile
+            # username (see _resolve_group) and the organization is
+            # auto-created when missing (see _ensure_group).
             self.group = group
         self.visibility = visibility
         self.git_author = git_author or _DEFAULT_GIT_AUTHOR
@@ -172,12 +183,18 @@ class CnbClient(GitPlatformClient):
         The target organization path, e.g. ``mycelium`` — CNB's namespace.
 
         CNB has no personal repositories: the namespace is the organization
-        path given by the caller (``group``), not the profile login. The
-        first access still fetches the profile (``GET /user``) to validate
-        the token early.
+        path — the caller's ``group``, or (when omitted) the organization
+        resolved from the profile username (username-named org, an existing
+        empty org, or a new username-named org). Every first access fetches
+        the profile (``GET /user``): it validates the token early and,
+        without ``group``, provides the username the organization is named
+        after.
         """
         if self._namespace is None:
-            self._request("GET", "/user")
+            if self.group is None:
+                self._resolve_group()  # fetches /user for the username
+            else:
+                self._request("GET", "/user")  # validate the token early
             self._namespace = self.group
         return self._namespace
 
@@ -193,9 +210,70 @@ class CnbClient(GitPlatformClient):
         response.raise_for_status()
         return response
 
+    def _resolve_group(self) -> str:
+        """Resolve the organization path, deriving it from the profile when ``group`` was omitted.
+
+        CNB repositories live inside organizations. When the caller does not
+        pass ``group``, the organization is chosen in this order:
+
+        1. the profile-username-named organization, when it already exists;
+        2. otherwise an existing organization with no repositories yet — the
+           module reuses it instead of creating a new one (the organizations
+           of the authorized user are listed with ``GET /user/groups``,
+           which needs the ``account-engage`` scope; without that scope the
+           search is skipped, HTTP 403 degrades gracefully);
+        3. otherwise the username-named organization, auto-created by
+           ``_ensure_group`` when missing.
+
+        The profile call (``GET /user``) also validates the token early.
+        """
+        if self.group is None:
+            data = self._request("GET", "/user").json()
+            username = _profile_username(data)
+            orgs = self._list_groups()
+            if orgs is not None:
+                if any(group.get("path") == username for group in orgs):
+                    self.group = username  # the username-named org exists
+                else:
+                    # Reuse the first existing organization with no repos.
+                    empty = next(
+                        (
+                            group.get("path")
+                            for group in orgs
+                            if group.get("sub_repo_count", 1) == 0
+                        ),
+                        None,
+                    )
+                    self.group = empty or username
+            else:
+                # account-engage scope missing: only the username-named org
+                # is considered (_ensure_group creates it when missing).
+                self.group = username
+        return self.group
+
+    def _list_groups(self) -> list[dict] | None:
+        """The organizations of the authorized user, or None when the ``account-engage`` scope is missing.
+
+        ``GET /user/groups`` returns one item per organization (``path``,
+        ``sub_repo_count``, ...). HTTP 403 — the token lacks the
+        ``account-engage`` scope — degrades to ``None``; any other failure
+        propagates.
+        """
+        try:
+            resp = self._request(
+                "GET", "/user/groups", params={"page": 1, "page_size": 100}
+            )
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 403:
+                return None
+            raise
+        data = resp.json()
+        return data if isinstance(data, list) else []
+
     def _group_path(self) -> str:
         """The URL path of the organization (each segment quoted, slashes kept)."""
-        return "/".join(quote(seg, safe="") for seg in self.group.split("/"))
+        group = self._resolve_group()
+        return "/".join(quote(seg, safe="") for seg in group.split("/"))
 
     def _repo_path(self) -> str:
         """The URL path of the target repository (``group/repo``)."""
@@ -420,6 +498,7 @@ class CnbClient(GitPlatformClient):
         self, file_path: str, content_bytes: bytes, commit_message: str
     ) -> dict:
         """Clone the target, overwrite ``file_path``, commit and push."""
+        self._resolve_group()
         remote = f"https://cnb.cool/{self.group}/{self.repo}"
         cred = self._write_credential_file()
         try:
@@ -577,18 +656,34 @@ def _identity_ticket(response: requests.Response | None) -> str | None:
     return None
 
 
+def _profile_username(data: dict) -> str:
+    """The organization path derived from the profile: its ``username`` field.
+
+    CNB's ``GET /user`` reports the account as ``username`` (e.g. the name
+    of the organization to auto-create); raise when the profile lacks it.
+    """
+    username = data.get("username")
+    if not username:
+        raise ValueError(f"user profile lacks a username: {data}")
+    return username
+
+
 if __name__ == "__main__":
-    # Usage demo: the token is always passed explicitly.
-    if len(sys.argv) < 3:
+    # Usage demo: the token is always passed explicitly; the organization is
+    # optional — without ``group`` it is resolved from the profile username
+    # (username-named org when it exists, else an existing empty org,
+    # else a username-named org is auto-created).
+    if len(sys.argv) not in (2, 3):
         raise SystemExit(
-            "usage: python -m mycelium.interface.sower.cnb <access_token> <group>"
+            "usage: python -m mycelium.interface.sower.cnb <access_token> [group]"
         )
     token = sys.argv[1]
-    group = sys.argv[2]
+    group = sys.argv[2] if len(sys.argv) > 2 else None
 
     # Repo mode: manage <group>/repo (organization and repository are created
     # when missing), then push. The namespace is the organization path — CNB
-    # has no personal repositories, so there is no automatic owner lookup.
+    # has no personal repositories; without ``group`` the organization is
+    # resolved from the profile username.
     client = CnbClient(
         access_token=token,
         repo="my-feed-repo",

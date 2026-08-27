@@ -90,6 +90,7 @@ mycelium://8pFEkFBqrQWgw6IzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPw
 
 ## 更新日志
 
+- **0.2.1**——CNB 模块：组织参数改为可选——省略 `group` 时按资料用户名解析组织（username 同名组织已存在则使用；否则复用已有空组织；否则自动创建 username 同名组织）。
 - **0.2.0**——新增 CNB（cnb.cool）平台模块：仓库以组织为单位（缺失时自动创建）、git push 写入（平台无 contents API）、`fork` 模式明确拒绝（CNB 无 fork API）。
 - **0.1.0**——新增一条命令的提交前门禁（`scripts/gate.py`，检查并自动修复）；`mdtables.py` 移出包外至 `scripts/`；表格对齐并入 Markdown 检查任务。
 - **0.0.1**——初始版本：加密订阅源分发协议，含确定性加密、protobuf 线格式与孢子链接；播种者/采摘者角色分离，支持 Gitee、GitCode 与 GitHub；采用菌丝体生态命名。

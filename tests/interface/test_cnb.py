@@ -4,8 +4,11 @@ mocked; these tests verify the request paths, parameters and logic
 branches). Pulling is picker behavior, so only ``push`` is exercised.
 
 CNB differs from Gitee/GitCode/GitHub in three ways covered here:
-- repositories live inside organizations: ``group`` is required in repo mode
-  and the namespace is the organization path, not the profile login;
+- repositories live inside organizations: ``group`` is optional in repo mode
+  (when omitted, the organization is resolved from the profile username —
+  username-named org when it exists, else an existing empty org is reused,
+  else a username-named org is auto-created) and the namespace is the
+  organization path, not the profile login;
 - there is no contents write API: ``push`` writes via a real ``git push``
   (``_git`` is mocked; the temporary credential store is exercised for real);
 - there is no fork API: ``fork`` mode parses the target name but raises
@@ -19,7 +22,11 @@ from unittest import mock
 
 import requests
 
-from mycelium.interface.sower.cnb import CnbClient, _identity_ticket
+from mycelium.interface.sower.cnb import (
+    CnbClient,
+    _identity_ticket,
+    _profile_username,
+)
 from mycelium.protocol import parse as parse_spore
 
 _split_fork = CnbClient._split_fork  # classmethod under test
@@ -61,13 +68,16 @@ class _Git:
 def make_client(**kwargs) -> CnbClient:
     """Build a client whose ``_request`` is replaced with a recording mock.
 
-    The namespace is pre-seeded so unit tests skip the ``GET /user`` profile
-    call; the auto-fetch itself is covered by ``TestNamespace``.
+    The namespace is pre-seeded (when an explicit ``group`` is given) so
+    unit tests skip the ``GET /user`` profile call; the auto-fetch and the
+    group resolution (username org / empty-org reuse / auto-create) are
+    covered by ``TestNamespace`` and the ``group=None`` tests.
     """
     defaults = dict(access_token="t", repo="my-feed", group="mycelium")
     defaults.update(kwargs)
     client = CnbClient(**defaults)
-    client._namespace = "mycelium"
+    if client.group is not None:
+        client._namespace = client.group
     client._request = mock.Mock()
     return client
 
@@ -128,7 +138,7 @@ class TestSplitFork(unittest.TestCase):
 
 
 class TestConstructor(unittest.TestCase):
-    """repo/fork are mutually exclusive; repo mode requires the group."""
+    """repo/fork are mutually exclusive; repo mode makes the group optional."""
 
     def test_repo_mode(self):
         client = CnbClient("t", repo="my-feed", group="mycelium")
@@ -139,9 +149,11 @@ class TestConstructor(unittest.TestCase):
         self.assertEqual(client.branch, "main")
         self.assertEqual(client.visibility, "public")
 
-    def test_repo_mode_requires_group(self):
-        with self.assertRaises(ValueError):
-            CnbClient("t", repo="my-feed")
+    def test_repo_mode_group_optional(self):
+        """Without ``group`` the org is resolved lazily from the profile username."""
+        client = CnbClient("t", repo="my-feed")
+        self.assertEqual(client.repo, "my-feed")
+        self.assertIsNone(client.group)
 
     def test_fork_mode_targets_source_name(self):
         client = CnbClient("t", fork="some/src")
@@ -187,6 +199,30 @@ class TestConstructor(unittest.TestCase):
 class TestNamespace(unittest.TestCase):
     """The namespace is the organization path; the profile call validates the token."""
 
+    def _client(self, profile, groups):
+        """A no-group client with canned /user and /user/groups endpoints.
+
+        ``groups=None`` simulates the missing ``account-engage`` scope
+        (``GET /user/groups`` answers HTTP 403).
+        """
+        client = CnbClient("t", repo="my-feed")
+        calls = []
+
+        def handler(method, endpoint, **kwargs):
+            calls.append((method, endpoint))
+            if endpoint == "/user":
+                return _Resp(200, profile)
+            if endpoint == "/user/groups":
+                if groups is None:
+                    return _Resp(403, {})  # account-engage scope missing
+                return _Resp(200, groups)
+            raise AssertionError(f"unexpected call: {method} {endpoint}")
+
+        client._request = mock.Mock()
+        attach(client, handler)
+        client._calls = calls
+        return client
+
     def test_namespace_is_group(self):
         client = make_client()
         client._namespace = None
@@ -201,6 +237,62 @@ class TestNamespace(unittest.TestCase):
         _ = client.namespace
         _ = client.namespace
         self.assertEqual(client._request.call_count, 1)
+
+    def test_without_group_uses_username_org_when_it_exists(self):
+        """The username-named org wins over any other org (even non-empty)."""
+        client = self._client(
+            {"username": "rainbow"},
+            [
+                {"path": "rainbow", "sub_repo_count": 3},
+                {"path": "empty", "sub_repo_count": 0},
+            ],
+        )
+        self.assertEqual(client.namespace, "rainbow")
+        self.assertEqual(client.group, "rainbow")
+        self.assertIn(("GET", "/user/groups"), client._calls)
+
+    def test_without_group_reuses_existing_empty_org(self):
+        """No username-named org -> the first existing org with no repos is reused."""
+        client = self._client(
+            {"username": "rainbow"},
+            [
+                {"path": "busy", "sub_repo_count": 2},
+                {"path": "spare", "sub_repo_count": 0},
+                {"path": "spare2", "sub_repo_count": 0},
+            ],
+        )
+        self.assertEqual(client.namespace, "spare")
+        self.assertEqual(client.group, "spare")
+
+    def test_without_group_no_empty_org_falls_back_to_username(self):
+        """No username org and no empty org -> the username org (auto-created later)."""
+        client = self._client(
+            {"username": "rainbow"}, [{"path": "busy", "sub_repo_count": 2}]
+        )
+        self.assertEqual(client.namespace, "rainbow")
+        self.assertEqual(client.group, "rainbow")
+
+    def test_without_group_no_orgs_falls_back_to_username(self):
+        client = self._client({"username": "rainbow"}, [])
+        self.assertEqual(client.namespace, "rainbow")
+        self.assertEqual(client.group, "rainbow")
+
+    def test_without_group_missing_scope_degrades_to_username(self):
+        """403 on /user/groups (no account-engage scope) -> username org only."""
+        client = self._client({"username": "rainbow"}, None)
+        self.assertEqual(client.namespace, "rainbow")
+        self.assertEqual(client.group, "rainbow")
+
+    def test_without_group_profile_lacks_username(self):
+        client = CnbClient("t", repo="my-feed")
+        client._request = mock.Mock(return_value=_Resp(200, {"nickname": "x"}))
+        with self.assertRaises(ValueError):
+            client.namespace
+
+    def test_profile_username_helper(self):
+        self.assertEqual(_profile_username({"username": "u"}), "u")
+        with self.assertRaises(ValueError):
+            _profile_username({})
 
 
 class TestEnsureRepoExists(unittest.TestCase):
@@ -265,6 +357,113 @@ class TestEnsureRepoExists(unittest.TestCase):
 
         create = next(c for c in calls if c[0] == "POST" and c[1] == "/groups")
         self.assertEqual(create[2]["json"]["path"], "mycelium")
+
+    def test_creates_username_group_when_omitted(self):
+        """No group -> org named after the profile username, created when missing."""
+        client = make_client(group=None)
+        calls = []
+
+        def handler(method, endpoint, **kwargs):
+            calls.append((method, endpoint, kwargs))
+            if method == "GET" and endpoint == "/user":
+                return _Resp(200, {"username": "rainbow"})
+            if method == "GET" and endpoint == "/user/groups":
+                return _Resp(200, [])  # no orgs to reuse
+            if method == "GET" and endpoint == "/rainbow/my-feed":
+                first = len([c for c in calls if c[0] == "GET" and c[1] == endpoint]) == 1
+                return _Resp(404, {}) if first else _Resp(200, {"name": "my-feed"})
+            if method == "GET" and endpoint == "/rainbow":
+                return _Resp(404, {})  # username-named org missing
+            if method == "POST" and endpoint == "/groups":
+                return _Resp(201, {})
+            if method == "POST" and endpoint == "/rainbow/-/repos":
+                return _Resp(201, {})
+            raise AssertionError(f"unexpected call: {method} {endpoint}")
+
+        attach(client, handler)
+        self.assertTrue(client.ensure_repo_exists())
+
+        create = next(c for c in calls if c[0] == "POST" and c[1] == "/groups")
+        self.assertEqual(create[2]["json"]["path"], "rainbow")
+        self.assertEqual(client.group, "rainbow")
+        self.assertEqual(sum(1 for c in calls if c[0] == "GET" and c[1] == "/user"), 1)
+
+    def test_uses_existing_username_group_when_omitted(self):
+        """No group -> an existing username-named org is used (no /groups creation)."""
+        client = make_client(group=None)
+        calls = []
+
+        def handler(method, endpoint, **kwargs):
+            calls.append((method, endpoint, kwargs))
+            if method == "GET" and endpoint == "/user":
+                return _Resp(200, {"username": "rainbow"})
+            if method == "GET" and endpoint == "/user/groups":
+                return _Resp(200, [{"path": "rainbow", "sub_repo_count": 2}])
+            if method == "GET" and endpoint == "/rainbow/my-feed":
+                first = len([c for c in calls if c[0] == "GET" and c[1] == endpoint]) == 1
+                return _Resp(404, {}) if first else _Resp(200, {"name": "my-feed"})
+            if method == "GET" and endpoint == "/rainbow":
+                return _Resp(200, {"path": "rainbow"})
+            if method == "POST" and endpoint == "/rainbow/-/repos":
+                return _Resp(201, {})
+            raise AssertionError(f"unexpected call: {method} {endpoint}")
+
+        attach(client, handler)
+        self.assertTrue(client.ensure_repo_exists())
+        self.assertFalse(any(c[0] == "POST" and c[1] == "/groups" for c in calls))
+        self.assertEqual(client.group, "rainbow")
+
+    def test_reuses_existing_empty_group_when_omitted(self):
+        """No group and no username org -> an existing empty org is reused."""
+        client = make_client(group=None)
+        calls = []
+
+        def handler(method, endpoint, **kwargs):
+            calls.append((method, endpoint, kwargs))
+            if method == "GET" and endpoint == "/user":
+                return _Resp(200, {"username": "rainbow"})
+            if method == "GET" and endpoint == "/user/groups":
+                return _Resp(200, [{"path": "spare", "sub_repo_count": 0}])
+            if method == "GET" and endpoint == "/spare/my-feed":
+                first = len([c for c in calls if c[0] == "GET" and c[1] == endpoint]) == 1
+                return _Resp(404, {}) if first else _Resp(200, {"name": "my-feed"})
+            if method == "GET" and endpoint == "/spare":
+                return _Resp(200, {"path": "spare"})  # exists -> not created
+            if method == "POST" and endpoint == "/spare/-/repos":
+                return _Resp(201, {})
+            raise AssertionError(f"unexpected call: {method} {endpoint}")
+
+        attach(client, handler)
+        self.assertTrue(client.ensure_repo_exists())
+        self.assertFalse(any(c[0] == "POST" and c[1] == "/groups" for c in calls))
+        self.assertEqual(client.group, "spare")
+
+    def test_scope_missing_creates_username_group(self):
+        """403 on /user/groups -> username-named org is created when missing."""
+        client = make_client(group=None)
+        calls = []
+
+        def handler(method, endpoint, **kwargs):
+            calls.append((method, endpoint, kwargs))
+            if method == "GET" and endpoint == "/user":
+                return _Resp(200, {"username": "rainbow"})
+            if method == "GET" and endpoint == "/user/groups":
+                return _Resp(403, {})  # account-engage scope missing
+            if method == "GET" and endpoint == "/rainbow/my-feed":
+                first = len([c for c in calls if c[0] == "GET" and c[1] == endpoint]) == 1
+                return _Resp(404, {}) if first else _Resp(200, {"name": "my-feed"})
+            if method == "GET" and endpoint == "/rainbow":
+                return _Resp(404, {})
+            if method == "POST" and endpoint == "/groups":
+                return _Resp(201, {})
+            if method == "POST" and endpoint == "/rainbow/-/repos":
+                return _Resp(201, {})
+            raise AssertionError(f"unexpected call: {method} {endpoint}")
+
+        attach(client, handler)
+        self.assertTrue(client.ensure_repo_exists())
+        create = next(c for c in calls if c[0] == "POST" and c[1] == "/groups")
+        self.assertEqual(create[2]["json"]["path"], "rainbow")
 
     def test_nested_group_not_auto_created(self):
         client = make_client(group="a/b")
@@ -464,6 +663,28 @@ class TestPush(unittest.TestCase):
                 client.push("feed.dat", b"x")
 
         self.assertEqual(state["n"], 1)  # no retry for non-transient errors
+
+    def test_push_resolves_username_group_for_remote(self):
+        """No group -> the git remote uses the resolved organization."""
+        client = make_client(group=None)
+
+        def handler(method, endpoint, **kwargs):
+            if method == "GET" and endpoint == "/user":
+                return _Resp(200, {"username": "rainbow"})
+            if method == "GET" and endpoint == "/user/groups":
+                return _Resp(200, [{"path": "spare", "sub_repo_count": 0}])
+            if method == "GET" and endpoint.endswith("/contents/feed.dat"):
+                return _Resp(404, {})
+            raise AssertionError(f"unexpected call: {method} {endpoint}")
+
+        attach(client, handler)
+        git = _Git()
+        client._git = git
+        client.push("feed.dat", b"x")
+
+        commands = [args for _, args, _ in git.calls]
+        self.assertEqual(commands[0][:2], ("clone", "https://cnb.cool/spare/my-feed"))
+        self.assertEqual(client.group, "spare")
 
 
 class TestExistingSha(unittest.TestCase):

@@ -11,6 +11,10 @@ Flow:
        because CNB limits root-organization creation to a yearly quota and
        the probe organization already exists (the auto-create path itself is
        exercised by the unit tests and was verified manually);
+    1b. A group-less client resolves the organization from the profile
+       username (no organization is created by this step — creation is
+       quota-limited and covered by the unit tests; an existing empty
+       organization would be reused instead);
     2. ensure_repo_exists() creates the repository (created this run);
     3. Push an encrypted sclerotium via CnbClient.push (a real git push:
        username cnb, the token as the password) and verify the file reads
@@ -103,6 +107,16 @@ def main() -> None:
     # token early (GET /user).
     ns = client.namespace
     print(f"[1] token OK, namespace = {ns} (organization path)")
+
+    # [1b] group is optional: without it the organization resolves to the
+    # profile username (no creation here — root-org creation is quota-limited
+    # and covered by unit tests; an existing empty organization would be
+    # reused instead).
+    client_default = CnbClient(TOKEN, repo=REPO, branch=BRANCH, visibility="private")
+    ns_default = client_default.namespace
+    assert ns_default and "/" not in ns_default, f"bad resolved group: {ns_default!r}"
+    assert client_default.group == ns_default
+    print(f"[1b] group omitted -> organization resolves to {ns_default!r} (profile username)")
 
     assert client.ensure_repo_exists() is True
     created_this_run = True

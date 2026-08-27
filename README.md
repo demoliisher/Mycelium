@@ -149,6 +149,10 @@ mycelium://8pFEkFBqrQWgw6IzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPw
 
 ## Changelog
 
+- **0.2.1** — CNB module: `group` is now optional — when omitted, the
+  organization is resolved from the profile username (the username-named
+  org when it exists, else an existing empty org is reused, else a
+  username-named org is auto-created).
 - **0.2.0** — Add the CNB (cnb.cool) platform module: organization-based
   repositories (auto-created when missing), git-push writes (the platform
   has no contents API), and a documented refusal of `fork` mode (no fork

@@ -77,9 +77,11 @@ a `pass` placeholder and `push` inherited abstract from `Storage`; each
 platform module `sower/gitee.py`, `sower/gitcode.py`,
 `sower/github.py`, `sower/cnb.py` implements the full lifecycle
 itself), the picker is pull-only (`picker/hypha.py`). The namespace is
-taken from `GET /user` on every platform **except CNB** (whose
-namespace is the organization path given by the caller — CNB has no
-personal repositories); access tokens arrive only via runtime arguments.
+taken from `GET /user` on every platform **except CNB** (whose namespace
+is the organization path — the caller's `group`, or the profile username
+when omitted, reusing an existing empty organization if available — CNB
+has no personal repositories); access tokens arrive only via runtime
+arguments.
 
 **`mycelium.utils`** — Base58, the `fake64` serialization, and misc type
 helpers. Project scripts (e.g. `scripts/mdtables.py`, the CJK-aware GFM
@@ -178,15 +180,18 @@ table alignment tool) live outside the package.
   private repositories.
 - **CNB** (cnb.cool) has **no personal repositories, no contents write API
   and no fork API**: repositories live inside organizations (the `group`
-  constructor argument, auto-created when missing — root-org creation is
-  yearly-quota-limited, HTTP 429), the feed blob is written with a real
-  `git push` (username `cnb`, token as password, temporary credential
-  store), and `fork` mode raises with a manual-fork hint. The API
-  authenticates with `Authorization: Bearer` and the raw endpoint requires
-  the token even for public repositories (pickers need an authenticated
-  session); OpenAPI deletion of root-org resources is refused with HTTP
-  412. Its `_write_file` raises (no contents API) and `push` retries
-  transient git failures itself.
+  constructor argument is optional — when omitted the organization is
+  resolved from the profile username: the username-named org when it
+  exists, else an existing empty org is reused (`GET /user/groups`,
+  `account-engage` scope), else a username-named org is auto-created;
+  root-org creation is yearly-quota-limited, HTTP 429), the feed blob is
+  written with a real `git push` (username `cnb`, token as password,
+  temporary credential store), and `fork` mode raises with a manual-fork
+  hint. The API authenticates with `Authorization: Bearer` and the raw
+  endpoint requires the token even for public repositories (pickers need
+  an authenticated session); OpenAPI deletion of root-org resources is
+  refused with HTTP 412. Its `_write_file` raises (no contents API) and
+  `push` retries transient git failures itself.
 - `Spore.parse` tolerates a missing header, and obfuscation is not
   encryption — treat spore-link fields as public.
 

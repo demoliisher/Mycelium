@@ -32,6 +32,13 @@ from mycelium.protocol import Sclerotium, Spore
 # ones here; entries already present are skipped on subsequent runs.
 entries = [
     (
+        "0.2.1",
+        "CNB module: the organization is now optional — when group is "
+        "omitted it resolves from the profile username (the username-named "
+        "org when it exists, else an existing empty org is reused, else a "
+        "username-named org is auto-created)",
+    ),
+    (
         "0.2.0",
         "Add the CNB (cnb.cool) platform module: organization-based "
         "repositories (auto-created when missing), git-push writes (the "

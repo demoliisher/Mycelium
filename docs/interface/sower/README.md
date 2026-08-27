@@ -262,11 +262,17 @@ platform-shaped differences:
 
 - **Repositories live inside organizations** (组织). CNB has no personal
   repository concept, so the constructor takes the organization path
-  explicitly (`group`) and creates it when missing. The `namespace`
-  therefore is the organization path, not the profile login — the one
-  deviation from the shared contract, which resolves the namespace from
-  `GET /user` everywhere else (the profile call still runs on first use to
-  validate the token).
+  (`group`) and creates it when missing. `group` is optional — when
+  omitted, the organization is resolved from the profile username: the
+  username-named organization when it already exists, else an existing
+  organization with no repositories yet (reused instead of creating a new
+  one; the organization list comes from `GET /user/groups`, which needs
+  the `account-engage` scope — without it the search is skipped), else a
+  username-named organization is auto-created. The `namespace` therefore
+  is the organization path, not the profile login — the one deviation from
+  the shared contract, which resolves the namespace from `GET /user`
+  everywhere else (the profile call still runs on first use to validate
+  the token and, without `group`, to learn the username).
 - **No contents write API** — `push` writes with a real `git push`: the
   module clones the repository into a temporary directory, overwrites the
   file, commits and pushes (username `cnb`, the access token as the
@@ -280,7 +286,8 @@ platform-shaped differences:
 Its feature set otherwise matches `GiteeClient`:
 
 - **`repo` mode** — manage `<group>/repo`: create it (and the organization
-  when missing) and push into it;
+  when missing) and push into it; without `group` the organization is
+  resolved from the profile username (see above);
 - the target repository name and visibility are set on creation
   (`visibility`: `public` / `private` / `secret`);
 - the commit identity written into the feed repository's git history is
@@ -298,6 +305,8 @@ picker session:
 ```python
 client = CnbClient(token, repo="my-feed-repo", group="mycelium",
                    visibility="private")
+# group is optional: without it the organization is resolved from the
+# profile username (username-named org, an existing empty org, or a new one).
 link = client.spore_link("feed.dat", cfg.vk)   # host: api.cnb.cool
 
 # The picker must attach the token (the raw endpoint requires it).
@@ -325,19 +334,22 @@ Set **资源范围 (resource scope) to 全部 (all)** and leave **常见场景
 **授权范围 (authorization scopes)** (everything else keeps the platform
 default: public repositories read-only, private ones without permission):
 
-| Scope                        | Why Mycelium needs it                                                                     |
-| ---------------------------- | ----------------------------------------------------------------------------------------- |
-| 只读 `account-profile`       | Resolve/validate the authorized user (`GET /user`, the namespace check)                   |
-| 读写 `repo-code`             | Read code/branches/commits and the **git push** (Git client credentials) — the write path |
-| 读写 `repo-delete`           | Delete repositories (live-test cleanup; often refused for root orgs)                      |
-| 读写 `group-manage`          | Auto-create the organization when it does not exist yet                                   |
-| 读写 `group-resource`        | Create repositories inside the organization                                               |
-| 只读 `repo-basic-info`       | Repository info reads (live tests)                                                        |
-| 读写 `group-delete`          | Delete the organization (live-test cleanup)                                               |
+| Scope                        | Why Mycelium needs it                                                                                       |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 只读 `account-profile`       | Resolve/validate the authorized user (`GET /user`, the namespace check)                                     |
+| 只读 `account-engage`        | List the authorized user's organizations (`GET /user/groups`) — the empty-org reuse when `group` is omitted |
+| 读写 `repo-code`             | Read code/branches/commits and the **git push** (Git client credentials) — the write path                   |
+| 读写 `repo-delete`           | Delete repositories (live-test cleanup; often refused for root orgs)                                        |
+| 读写 `group-manage`          | Auto-create the organization when it does not exist yet                                                     |
+| 读写 `group-resource`        | Create repositories inside the organization                                                                 |
+| 只读 `repo-basic-info`       | Repository info reads (live tests)                                                                          |
+| 读写 `group-delete`          | Delete the organization (live-test cleanup)                                                                 |
 
 Note: CNB limits root-organization creation to a yearly quota — if
 auto-creation fails with HTTP 429, create the organization once on the web
-UI and pass its path as `group`.
+UI and pass its path as `group` (when `group` is omitted the module reuses
+an existing organization without repositories first, so a new one is only
+created when nothing is available).
 
 ## Adding a Platform
 
