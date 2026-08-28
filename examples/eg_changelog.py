@@ -32,6 +32,25 @@ from mycelium.protocol import Sclerotium, Spore
 # ones here; entries already present are skipped on subsequent runs.
 entries = [
     (
+        "0.3.0",
+        "Add the skills/ directory — task-oriented agent workflows "
+        "(release, gate, docs-sync, feed-ops, platform-add) that reference "
+        "AGENTS.md instead of restating it",
+    ),
+    (
+        "0.2.4",
+        "Link the official CNB references from the sower docs and AGENTS.md "
+        "(OpenAPI spec, cnb-skill repository, platform docs)",
+    ),
+    (
+        "0.2.3",
+        "Record the official CNB OpenAPI constraints: root_group_protection "
+        "is read-only (web-only), sub-organizations are read-only (the "
+        "yearly root-org quota cannot be bypassed), git writes exist only "
+        "via blobs (a real git push is the only write path), and the "
+        "x-cnb-identity-ticket header gates deletes",
+    ),
+    (
         "0.2.2",
         "CNB module: delete_repo explains the web-only setting 允许通过 "
         "Open API 删除组织下资源 (组织设置 → 管控 → 组织管控 → 危险操作) when "

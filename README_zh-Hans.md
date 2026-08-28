@@ -90,6 +90,9 @@ mycelium://8pFEkFBqrQWgw6IzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPw
 
 ## 更新日志
 
+- **0.3.0**——新增 `skills/` 目录：面向任务的代理工作流（release / gate / docs-sync / feed-ops / platform-add），引用 AGENTS.md 而非复述规则。
+- **0.2.4**——CNB 模块文档与 AGENTS.md 链接官方参考（OpenAPI、cnb-skill 仓库、平台文档）。
+- **0.2.3**——CNB 模块：记录官方 OpenAPI 约束——`root_group_protection` 只读（仅网页可改）、子组织只读（根组织年度配额无法绕过）、git 写仅限 blobs（真 git push 是唯一写入途径）、`x-cnb-identity-ticket` 头管控四类删除。
 - **0.2.2**——CNB 模块：`delete_repo` 在 OpenAPI 删除被拒（HTTP 412）时给出网页开关「允许通过 Open API 删除组织下资源」（组织设置 → 管控 → 组织管控 → 危险操作）的指引；文档补充删除规则（组织需先清空；年度创建配额不因删除而释放），并建议非必要勿删组织（删除即永久损失配额）。
 - **0.2.1**——CNB 模块：组织参数改为可选——省略 `group` 时按资料用户名解析组织（username 同名组织已存在则使用；否则复用已有空组织；否则自动创建 username 同名组织）。
 - **0.2.0**——新增 CNB（cnb.cool）平台模块：仓库以组织为单位（缺失时自动创建）、git push 写入（平台无 contents API）、`fork` 模式明确拒绝（CNB 无 fork API）。

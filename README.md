@@ -149,6 +149,16 @@ mycelium://8pFEkFBqrQWgw6IzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPw
 
 ## Changelog
 
+- **0.3.0** — Add `skills/`: task-oriented agent workflows (`release`,
+  `gate`, `docs-sync`, `feed-ops`, `platform-add`) that reference
+  `AGENTS.md` instead of restating it.
+- **0.2.4** — CNB module docs and `AGENTS.md` link the official CNB
+  references (OpenAPI spec, cnb-skill repository, platform docs).
+- **0.2.3** — CNB module: record the official OpenAPI constraints —
+  `root_group_protection` is read-only (web-only), sub-organizations are
+  read-only (the yearly root-org quota cannot be bypassed), git writes
+  exist only via blobs (a real git push is the only write path), and the
+  `x-cnb-identity-ticket` header gates deletes.
 - **0.2.2** — CNB module: `delete_repo` explains the web-only setting
   允许通过 Open API 删除组织下资源 (组织设置 → 管控 → 组织管控 → 危险操作) when
   OpenAPI deletion is refused (HTTP 412); docs cover the deletion rules

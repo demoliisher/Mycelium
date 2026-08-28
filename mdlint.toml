@@ -41,3 +41,23 @@ enabled = false
 # MD013: no line-length limit — see the header comment.
 [rules.MD013]
 enabled = false
+
+# MD022 / MD026 / MD041 / MD003: disabled — SKILL.md files (skills/)
+# start with YAML frontmatter (`name:` / `description:`) that
+# markdownlint-rs mis-parses as headings (MD022/MD026/MD041 on the
+# `name:` line, MD003 on `description:`); the parser has no frontmatter
+# support and its auto-fix cannot apply to these. Disabling them
+# globally costs nothing — the rest of the docs follow these
+# conventions anyway (Atx headings, H1 first line, no trailing
+# punctuation, blank lines around headings).
+[rules.MD022]
+enabled = false
+
+[rules.MD026]
+enabled = false
+
+[rules.MD041]
+enabled = false
+
+[rules.MD003]
+enabled = false

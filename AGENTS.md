@@ -27,14 +27,15 @@ verification key embedded in the link.
 
 ## Repository layout
 
-| Path                               | Purpose                                                                                                                                                        |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/mycelium/`                    | Source package (`crypto`, `protocol`, `interface`, `utils`)                                                                                                    |
-| `src/mycelium/protocol/feed.proto` | Protobuf source of truth; `feed_pb.py` is generated next to it                                                                                                 |
-| `docs/`                            | Module docs mirroring the package layout (English + optional `_zh-Hans.md` translations)                                                                       |
-| `tests/`                           | Unit tests mirroring the package layout; live platform tests in `tests/interface/`                                                                             |
-| `examples/`                        | Runnable end-to-end examples (`eg_publish.py`, `eg_subscribe.py`, `eg_changelog.py`); the generated changelog feed `ChangeLog.dat` is committed as an example  |
-| `scripts/`                         | Project scripts outside the package (`gate.py`, the one-command check-and-fix pre-submit gate; `mdtables.py`, the CJK-aware GFM table alignment checker/fixer) |
+| Path                               | Purpose                                                                                                                                                         |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/mycelium/`                    | Source package (`crypto`, `protocol`, `interface`, `utils`)                                                                                                     |
+| `src/mycelium/protocol/feed.proto` | Protobuf source of truth; `feed_pb.py` is generated next to it                                                                                                  |
+| `docs/`                            | Module docs mirroring the package layout (English + optional `_zh-Hans.md` translations)                                                                        |
+| `tests/`                           | Unit tests mirroring the package layout; live platform tests in `tests/interface/`                                                                              |
+| `examples/`                        | Runnable end-to-end examples (`eg_publish.py`, `eg_subscribe.py`, `eg_changelog.py`); the generated changelog feed `ChangeLog.dat` is committed as an example   |
+| `skills/`                          | Task-oriented agent skills (`release`, `gate`, `docs-sync`, `feed-ops`, `platform-add`) — per-task workflows that reference `AGENTS.md` instead of restating it |
+| `scripts/`                         | Project scripts outside the package (`gate.py`, the one-command check-and-fix pre-submit gate; `mdtables.py`, the CJK-aware GFM table alignment checker/fixer)  |
 
 ## Commands
 
