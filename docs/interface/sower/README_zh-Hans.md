@@ -195,6 +195,8 @@ Hypha(session=TokenSession()).pull(link)
 
 删除说明：默认情况下 OpenAPI 会拒绝删除根组织下的仓库（HTTP 412「root group management rules」）。在组织设置中开启「允许通过 Open API 删除组织下资源」（组织设置 → 管控 → 组织管控 → 危险操作）后，`delete_repo` 即可删除——该开关仅能在网页修改（API 的设置端点会忽略它）；遇到 412 时 `delete_repo` 会抛出带此指引的 `ValueError`。组织本身需在清空（所有仓库/子组织删除后）才能删除；删除组织不会释放根组织年度创建配额（HTTP 429）——**根组织年度配额宝贵，非必要勿删组织**（删除即永久损失配额）。
 
+官方 OpenAPI（<https://api.cnb.cool/swagger.json>）证实了上述设计：`root_group_protection` 仅存在于 `GET /{slug}/-/settings` 的响应中（`PUT` 请求体不含该字段，故仅网页可改）；子组织只有只读端点（`GET /user/groups/{slug}` 与 `GET /{slug}/-/sub-groups`，无创建端点，根组织年度配额无法绕过）；git 写接口只有 `POST /{repo}/-/git/blobs` 一个（无 tree/commit/ref 写接口，真 git push 是唯一提交途径）；`x-cnb-identity-ticket`（微信身份验证票据，首次请求返回）是仓库、组织、任务集、制品库四类删除操作的通用门槛。
+
 > **为避免污染开源社区，请勿向上游仓库提交 PR**——复刻副本是伪装容器，不是贡献。
 
 **令牌权限配置。** 在 [cnb.cool/profile/token](https://cnb.cool/profile/token)（个人设置 → 访问令牌）创建。**资源范围选「全部」**，**常见场景不选**；然后在**授权范围**中只勾选下表所列项（其余保持平台默认：公开仓库默认只读、私有默认无权限）：

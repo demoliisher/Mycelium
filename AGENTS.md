@@ -195,7 +195,17 @@ table alignment tool) live outside the package.
   `ValueError` with that guidance on 412; the org itself is deleted only
   when empty, and deleting orgs does not free the yearly creation quota —
   treat root organizations as a scarce yearly resource: do not delete
-  them unless necessary.
+  them unless necessary. The official OpenAPI spec
+  (<https://api.cnb.cool/swagger.json>) confirms the platform constraints:
+  `root_group_protection` is read-only (absent from the `PUT
+  /{slug}/-/settings` body — web-only), sub-organizations are read-only
+  (`GET /user/groups/{slug}`, `GET /{slug}/-/sub-groups`; no create
+  endpoint, so the yearly root-org quota cannot be bypassed), the only
+  git write endpoint is `POST /{repo}/-/git/blobs` (no tree/commit/ref
+  writes — a real git push is the only write path), there is no
+  fork-creation endpoint, and the `x-cnb-identity-ticket` header (WeChat
+  auth ticket, returned on the first attempt) gates `DELETE` on
+  repositories, organizations, missions and registries alike.
   Its `_write_file` raises (no contents API) and `push` retries transient
   git failures itself.
 - `Spore.parse` tolerates a missing header, and obfuscation is not

@@ -328,7 +328,17 @@ organization itself can only be deleted once it is empty (all
 repositories/sub-organizations removed), and deleting organizations does
 not free the yearly root-organization creation quota (HTTP 429) — treat
 root organizations as a scarce yearly resource: **do not delete them
-unless necessary**, deletion is permanent quota loss.
+unless necessary**, deletion is permanent quota loss. The official
+OpenAPI spec (<https://api.cnb.cool/swagger.json>) confirms this design:
+`root_group_protection` appears only in the `GET /{slug}/-/settings`
+response (the `PUT` body omits it — web-only), sub-organizations are
+read-only (`GET /user/groups/{slug}`, `GET /{slug}/-/sub-groups`; no
+create endpoint, so the yearly root-org quota cannot be bypassed),
+`POST /{repo}/-/git/blobs` is the only git write endpoint (no
+tree/commit/ref writes — a real git push is the only write path), and
+the `x-cnb-identity-ticket` header (a WeChat auth ticket returned on the
+first attempt) gates every dangerous DELETE (repository, organization,
+mission, registry).
 
 > **To avoid polluting the open-source community, never send pull requests
 > to upstream repositories** — a forked copy is a disguise container, not a

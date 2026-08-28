@@ -389,7 +389,13 @@ class CnbClient(GitPlatformClient):
             raise
 
     def _ensure_group(self) -> None:
-        """Create the organization when missing (CNB repositories live in orgs)."""
+        """Create the organization when missing (CNB repositories live in orgs).
+
+        Nested (sub-)organizations cannot be auto-created: the official
+        OpenAPI (api.cnb.cool/swagger.json) has no sub-organization create
+        endpoint — only the read-only ``GET /user/groups/{slug}`` and
+        ``GET /{slug}/-/sub-groups`` — so a nested ``group`` path raises.
+        """
         try:
             self._request("GET", f"/{self._group_path()}")
         except requests.exceptions.HTTPError as e:
@@ -454,11 +460,15 @@ class CnbClient(GitPlatformClient):
         CNB refuses OpenAPI deletion with HTTP 412 ("root group management
         rules") until the organization's web setting 允许通过 Open API 删除组织下资源
         (组织设置 → 管控 → 组织管控 → 危险操作) is enabled; that toggle is
-        web-only, so on a 412 a ``ValueError`` with this guidance is raised.
-        The organization itself can only be deleted once it is empty (all
-        repositories/sub-organizations removed). A refused first attempt may
-        also carry an ``x-cnb-identity-ticket`` that must be echoed back (the
-        swagger documents the header); that retry is handled here.
+        web-only (the official OpenAPI at api.cnb.cool/swagger.json exposes
+        ``root_group_protection`` only in the ``GET /{slug}/-/settings``
+        response — the ``PUT`` body omits it), so on a 412 a ``ValueError``
+        with this guidance is raised. The organization itself can only be
+        deleted once it is empty (all repositories/sub-organizations
+        removed). A refused first attempt may also carry an
+        ``x-cnb-identity-ticket`` that must be echoed back (the swagger
+        documents the header — a WeChat auth ticket returned on the first
+        request); that retry is handled here.
         """
         endpoint = f"/{self._repo_path()}"
         headers: dict[str, str] = {}
