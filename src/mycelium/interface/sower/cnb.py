@@ -39,10 +39,16 @@ Two further platform quirks:
   repositories — CNB spore links always need an authenticated picker
   session (``mycelium.interface.picker.Hypha`` with a ``requests.Session``
   that attaches the token).
-- The OpenAPI refuses to delete repositories/organizations inside root
-  organizations (HTTP 412, "root group management rules") unless the
-  platform allows it; ``delete_repo`` propagates that refusal, so cleanup
-  may have to happen on the CNB web UI.
+- The OpenAPI refuses to delete repositories inside root organizations
+  (HTTP 412, "root group management rules") until the organization's
+  web-only setting 允许通过 Open API 删除组织下资源 (组织设置 → 管控 → 组织管控 →
+  危险操作) is enabled — that toggle cannot be flipped through the API.
+  ``delete_repo`` raises with this guidance on a 412. The organization
+  itself is deleted only once it is empty (all repositories and
+  sub-organizations removed), and deleting organizations does not free the
+  yearly root-organization creation quota (HTTP 429) — treat root
+  organizations as a scarce yearly resource: do not delete them unless
+  necessary.
 
 The feed blob is written through ``push`` via a git push. Pulling it back
 is picker behavior — use ``mycelium.interface.picker`` (``Hypha``) for that.
@@ -445,11 +451,14 @@ class CnbClient(GitPlatformClient):
     def delete_repo(self) -> None:
         """Delete this repository (tests/cleanup only).
 
-        CNB may refuse with HTTP 412 ("root group management rules") for
-        repositories inside protected root organizations — the platform then
-        requires deletion through the CNB web UI. A refused first attempt
-        may also carry an ``x-cnb-identity-ticket`` that must be echoed back
-        (the swagger documents the header); that retry is handled here.
+        CNB refuses OpenAPI deletion with HTTP 412 ("root group management
+        rules") until the organization's web setting 允许通过 Open API 删除组织下资源
+        (组织设置 → 管控 → 组织管控 → 危险操作) is enabled; that toggle is
+        web-only, so on a 412 a ``ValueError`` with this guidance is raised.
+        The organization itself can only be deleted once it is empty (all
+        repositories/sub-organizations removed). A refused first attempt may
+        also carry an ``x-cnb-identity-ticket`` that must be echoed back (the
+        swagger documents the header); that retry is handled here.
         """
         endpoint = f"/{self._repo_path()}"
         headers: dict[str, str] = {}
@@ -462,6 +471,13 @@ class CnbClient(GitPlatformClient):
                 if attempt == 0 and ticket is not None:
                     headers["X-Cnb-Identity-Ticket"] = ticket
                     continue
+                if e.response is not None and e.response.status_code == 412:
+                    raise ValueError(
+                        "CNB refused the OpenAPI deletion (HTTP 412, root group "
+                        "management rules): enable 允许通过 Open API 删除组织下资源 "
+                        "in the organization's web settings (组织设置 → 管控 → "
+                        "组织管控 → 危险操作) and retry"
+                    ) from e
                 raise
 
     # ---------- file operations (the Storage contract) ----------

@@ -149,6 +149,12 @@ mycelium://8pFEkFBqrQWgw6IzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPw
 
 ## Changelog
 
+- **0.2.2** — CNB module: `delete_repo` explains the web-only setting
+  允许通过 Open API 删除组织下资源 (组织设置 → 管控 → 组织管控 → 危险操作) when
+  OpenAPI deletion is refused (HTTP 412); docs cover the deletion rules
+  (the org must be empty; the yearly creation quota is not freed by
+  deletion) and advise against deleting organizations — deletion is
+  permanent quota loss.
 - **0.2.1** — CNB module: `group` is now optional — when omitted, the
   organization is resolved from the profile username (the username-named
   org when it exists, else an existing empty org is reused, else a

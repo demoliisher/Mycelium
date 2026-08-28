@@ -7,10 +7,11 @@ the development-period test token in tests/interface/tokens.py:
 
 Flow:
     1. CnbClient(token, repo="<fresh>", group="mycelium-cnb-probe") -> the
-       target is <group>/<repo>; the organization is NOT auto-created here
-       because CNB limits root-organization creation to a yearly quota and
-       the probe organization already exists (the auto-create path itself is
-       exercised by the unit tests and was verified manually);
+       target is <group>/<repo>. The organization is NOT auto-created here:
+       CNB limits root-organization creation to a yearly quota (HTTP 429,
+       web and API alike), so the probe organization must already exist —
+       create it in the CNB web UI when the quota allows (the auto-create
+       path itself is exercised by the unit tests);
     1b. A group-less client resolves the organization from the profile
        username (no organization is created by this step — creation is
        quota-limited and covered by the unit tests; an existing empty
@@ -23,9 +24,13 @@ Flow:
        Hypha + a Bearer session (the CNB raw endpoint requires the token
        even for public repositories);
     5. Push an update and verify the picker sees the new content;
-    6. Cleanup: delete_repo() is attempted — CNB usually refuses OpenAPI
-       deletion inside root organizations (HTTP 412), so the repository may
-       have to be removed on the CNB web UI afterwards.
+    6. Cleanup: delete_repo() is attempted — it succeeds when the
+       organization's web setting 允许通过 Open API 删除组织下资源 (组织设置 →
+       管控 → 组织管控 → 危险操作) is enabled; otherwise delete_repo raises a
+       ValueError with that guidance. Only the repository is deleted — the
+       organization itself is left in place: root-org creation is
+       yearly-quota-limited (HTTP 429) and deleting an org never returns
+       its quota (do not delete organizations unless necessary).
 """
 
 from __future__ import annotations
@@ -55,7 +60,9 @@ if not TOKEN:
 if not TOKEN:
     sys.exit("usage: python tests/interface/live_cnb.py <access_token>")
 
-# The probe organization (exists; CNB limits root-org creation per year).
+# The probe organization (must already exist — CNB limits root-org
+# creation per year, HTTP 429, web and API alike; create it in the CNB
+# web UI when the quota allows).
 GROUP = "mycelium-cnb-probe"
 REPO = f"mycelium-live-{random.randint(10000, 99999)}"
 BRANCH = "main"
@@ -76,6 +83,9 @@ class _TokenSession(requests.Session):
 
 
 def cleanup(client: CnbClient) -> None:
+    # Deletes only the repository, never the organization: root-org
+    # creation is yearly-quota-limited (HTTP 429) and deleting an org does
+    # not free the quota — keep non-essential organizations around.
     global created_this_run
     if not created_this_run:
         print(f"  [cleanup] {GROUP}/{REPO} was not created this run - nothing to delete")
@@ -83,12 +93,14 @@ def cleanup(client: CnbClient) -> None:
     try:
         client.delete_repo()
         print(f"  [cleanup] deleted {GROUP}/{REPO} via OpenAPI")
+    except ValueError as e:
+        print(f"  [cleanup] delete {GROUP}/{REPO} -> {e}")
     except requests.exceptions.HTTPError as e:
         code = e.response.status_code if e.response is not None else "?"
         print(
             f"  [cleanup] delete {GROUP}/{REPO} -> HTTP {code} "
-            "(CNB blocks OpenAPI deletion in root organizations; "
-            "remove it on the CNB web UI if desired)"
+            "(enable 允许通过 Open API 删除组织下资源 in the org's web settings "
+            "to allow OpenAPI deletion)"
         )
 
 

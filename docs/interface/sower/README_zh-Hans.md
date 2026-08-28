@@ -193,7 +193,7 @@ class TokenSession(requests.Session):
 Hypha(session=TokenSession()).pull(link)
 ```
 
-另请注意：OpenAPI 会拒绝删除根组织下的仓库/组织（HTTP 412「root group management rules」）——`delete_repo` 会如实抛出该拒绝，必要时清理需在 CNB 网页上进行。
+删除说明：默认情况下 OpenAPI 会拒绝删除根组织下的仓库（HTTP 412「root group management rules」）。在组织设置中开启「允许通过 Open API 删除组织下资源」（组织设置 → 管控 → 组织管控 → 危险操作）后，`delete_repo` 即可删除——该开关仅能在网页修改（API 的设置端点会忽略它）；遇到 412 时 `delete_repo` 会抛出带此指引的 `ValueError`。组织本身需在清空（所有仓库/子组织删除后）才能删除；删除组织不会释放根组织年度创建配额（HTTP 429）——**根组织年度配额宝贵，非必要勿删组织**（删除即永久损失配额）。
 
 > **为避免污染开源社区，请勿向上游仓库提交 PR**——复刻副本是伪装容器，不是贡献。
 
@@ -210,7 +210,7 @@ Hypha(session=TokenSession()).pull(link)
 | 只读 `repo-basic-info`  | 仓库信息读取（live 测试）                                                               |
 | 读写 `group-delete`     | 删除组织（live 测试清理）                                                               |
 
-注意：CNB 对根组织的创建有年度配额——若自动创建报 HTTP 429，请先在网页创建一次组织，再把其路径作为 `group` 传入（省略 `group` 时模块会优先复用已有的空组织，仅在无可用组织时才新建）。
+注意：CNB 对根组织的创建有年度配额，且**网页与 API 共用该配额**（配额耗尽后网页创建同样返回 HTTP 429，删除组织也不会释放）——若自动创建报 HTTP 429，需等待配额恢复或由平台管理员创建组织，再将其路径作为 `group` 传入（省略 `group` 时模块会优先复用已有的空组织，仅在无可用组织时才新建）。
 
 ## 添加平台 Adding a Platform
 

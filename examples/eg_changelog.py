@@ -32,6 +32,14 @@ from mycelium.protocol import Sclerotium, Spore
 # ones here; entries already present are skipped on subsequent runs.
 entries = [
     (
+        "0.2.2",
+        "CNB module: delete_repo explains the web-only setting 允许通过 "
+        "Open API 删除组织下资源 (组织设置 → 管控 → 组织管控 → 危险操作) when "
+        "OpenAPI deletion is refused (HTTP 412); docs cover the deletion "
+        "rules (empty org required, yearly creation quota not freed by "
+        "deletion)",
+    ),
+    (
         "0.2.1",
         "CNB module: the organization is now optional — when group is "
         "omitted it resolves from the profile username (the username-named "

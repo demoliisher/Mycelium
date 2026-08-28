@@ -769,11 +769,23 @@ class TestDeleteRepo(unittest.TestCase):
         self.assertEqual(len(calls), 2)
         self.assertEqual(calls[1][2]["headers"]["X-Cnb-Identity-Ticket"], "tkt-123")
 
-    def test_delete_refusal_without_ticket_propagates(self):
+    def test_delete_412_raises_with_web_setting_hint(self):
+        """412 (root group protection) -> ValueError with the web-setting guidance."""
         client = make_client()
 
         def handler(method, endpoint, **kwargs):
             return _Resp(412, {"errcode": 9, "errmsg": "root group management rules"})
+
+        attach(client, handler)
+        with self.assertRaises(ValueError) as ctx:
+            client.delete_repo()
+        self.assertIn("允许通过 Open API 删除组织下资源", str(ctx.exception))
+
+    def test_delete_other_errors_propagate(self):
+        client = make_client()
+
+        def handler(method, endpoint, **kwargs):
+            return _Resp(500, {})
 
         attach(client, handler)
         with self.assertRaises(requests.exceptions.HTTPError):

@@ -319,9 +319,16 @@ class TokenSession(requests.Session):
 Hypha(session=TokenSession()).pull(link)
 ```
 
-Also note: the OpenAPI refuses to delete repositories/organizations inside
-root organizations (HTTP 412, "root group management rules") — `delete_repo`
-propagates that refusal, so cleanup may have to happen on the CNB web UI.
+Deletion: by default the OpenAPI refuses to delete repositories inside
+root organizations (HTTP 412, "root group management rules"). Enable the
+web-only setting 允许通过 Open API 删除组织下资源 in the organization's
+settings (组织设置 → 管控 → 组织管控 → 危险操作) and `delete_repo` works —
+on a 412 `delete_repo` raises a `ValueError` carrying this guidance. The
+organization itself can only be deleted once it is empty (all
+repositories/sub-organizations removed), and deleting organizations does
+not free the yearly root-organization creation quota (HTTP 429) — treat
+root organizations as a scarce yearly resource: **do not delete them
+unless necessary**, deletion is permanent quota loss.
 
 > **To avoid polluting the open-source community, never send pull requests
 > to upstream repositories** — a forked copy is a disguise container, not a
@@ -345,11 +352,14 @@ default: public repositories read-only, private ones without permission):
 | 只读 `repo-basic-info`       | Repository info reads (live tests)                                                                          |
 | 读写 `group-delete`          | Delete the organization (live-test cleanup)                                                                 |
 
-Note: CNB limits root-organization creation to a yearly quota — if
-auto-creation fails with HTTP 429, create the organization once on the web
-UI and pass its path as `group` (when `group` is omitted the module reuses
-an existing organization without repositories first, so a new one is only
-created when nothing is available).
+Note: CNB limits root-organization creation to a yearly quota that applies
+to the web UI and the API alike (creating via the web UI also returns
+HTTP 429 once exhausted, and deleting organizations does not free it) —
+if auto-creation fails with HTTP 429, the organization has to be created
+when the quota allows or by the platform admin, and its path passed as
+`group` (when `group` is omitted the module reuses an existing
+organization without repositories first, so a new one is only created
+when nothing is available).
 
 ## Adding a Platform
 

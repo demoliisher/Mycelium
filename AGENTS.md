@@ -184,14 +184,20 @@ table alignment tool) live outside the package.
   resolved from the profile username: the username-named org when it
   exists, else an existing empty org is reused (`GET /user/groups`,
   `account-engage` scope), else a username-named org is auto-created;
-  root-org creation is yearly-quota-limited, HTTP 429), the feed blob is
+  root-org creation is yearly-quota-limited (web and API alike), HTTP 429), the feed blob is
   written with a real `git push` (username `cnb`, token as password,
   temporary credential store), and `fork` mode raises with a manual-fork
   hint. The API authenticates with `Authorization: Bearer` and the raw
   endpoint requires the token even for public repositories (pickers need
-  an authenticated session); OpenAPI deletion of root-org resources is
-  refused with HTTP 412. Its `_write_file` raises (no contents API) and
-  `push` retries transient git failures itself.
+  an authenticated session). OpenAPI deletion of root-org resources is
+  refused with HTTP 412 until the web-only setting 允许通过 Open API 删除组织下资源
+  (组织设置 → 管控 → 组织管控 → 危险操作) is enabled — `delete_repo` raises a
+  `ValueError` with that guidance on 412; the org itself is deleted only
+  when empty, and deleting orgs does not free the yearly creation quota —
+  treat root organizations as a scarce yearly resource: do not delete
+  them unless necessary.
+  Its `_write_file` raises (no contents API) and `push` retries transient
+  git failures itself.
 - `Spore.parse` tolerates a missing header, and obfuscation is not
   encryption — treat spore-link fields as public.
 
