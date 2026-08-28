@@ -5,11 +5,11 @@ Full pre-submit gate: check everything, auto-fix what can be fixed.
 
 Run from the repository root:
 
-    uv run python scripts/gate.py
+    uv run python skills/gate/scripts/gate.py
 
 Every step checks and fixes where possible: code style (``ruff check
 --fix``), markdown lint (``mdlint check --fix``) and table alignment
-(``scripts/mdtables.py --fix``); tests (``pytest``) run as-is. Each
+(``skills/gate/scripts/mdtables.py --fix``); tests (``pytest``) run as-is. Each
 command's output streams to the terminal as the diagnostic log, and the
 gate exits non-zero if anything is still broken after fixing. The
 classical Chinese README (``README_zh-lzh.md``) is author-only: the gate
@@ -40,12 +40,12 @@ STEPS: list[tuple[str, list[str], bool]] = [
     ),
     (
         "Table alignment",
-        ["uv", "run", "python", "scripts/mdtables.py", "--fix"],
+        ["uv", "run", "python", "skills/gate/scripts/mdtables.py", "--fix"],
         True,
     ),
     (
         "Table alignment (verify)",
-        ["uv", "run", "python", "scripts/mdtables.py"],
+        ["uv", "run", "python", "skills/gate/scripts/mdtables.py"],
         False,
     ),
 ]
@@ -76,7 +76,7 @@ def main() -> int:
     if failed:
         print(
             f"\nGate FAILED: {', '.join(failed)}. Fix the remaining issues "
-            "and re-run `uv run python scripts/gate.py`.",
+            "and re-run `uv run python skills/gate/scripts/gate.py`.",
             file=sys.stderr,
         )
         return 1

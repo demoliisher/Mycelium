@@ -104,7 +104,7 @@ Every documentation change must pass:
 
 1. **Markdown lint, in two commands** — first
    `uv run mdlint check --config mdlint.toml .` (markdownlint-rs with the
-   repository config), then `uv run python scripts/mdtables.py` (GFM table
+   repository config), then `uv run python skills/gate/scripts/mdtables.py` (GFM table
    column alignment, the MD060 "aligned" style, CJK-width aware). Two notes
    on the markdownlint-rs config: MD033 (inline HTML) and MD030 (list
    marker spacing) are **intentionally disabled** (MD030 because
@@ -117,7 +117,7 @@ Every documentation change must pass:
    entirely**: prose is written as natural long lines, because wrapping
    (especially CJK) text to a fixed width inserts spurious spaces when
    rendered. After editing any table, run
-   `uv run python scripts/mdtables.py --fix` to realign in place, then
+   `uv run python skills/gate/scripts/mdtables.py --fix` to realign in place, then
    re-check.
 
 Writing conventions:
@@ -150,6 +150,6 @@ Run the full gate with one command — it checks and auto-fixes code style
 (ruff), tests (pytest), markdown lint (mdlint) and table alignment
 (mdtables):
 
-| Check           | Command                         |
-| --------------- | ------------------------------- |
-| Full gate       | `uv run python scripts/gate.py` |
+| Check           | Command                                     |
+| --------------- | ------------------------------------------- |
+| Full gate       | `uv run python skills/gate/scripts/gate.py` |

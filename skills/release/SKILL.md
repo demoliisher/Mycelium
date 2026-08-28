@@ -35,8 +35,9 @@ rules — read those files first.
     `uv run python examples/eg_changelog.py` (updates
     `examples/ChangeLog.dat`; the canonical spore link must stay stable —
     never hand-edit the `.dat`).
-- **4. Run the full gate**: `uv run python scripts/gate.py` — fix
-  anything it flags and re-run until green.
+- **4. Run the full gate**:
+  `uv run python skills/gate/scripts/gate.py` — fix anything it flags
+  and re-run until green.
 - **5. Audit identity**:
   - `git config user.name` / `user.email` must be `demoliisher` /
     `txpbyy@proton.me`;

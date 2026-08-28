@@ -27,15 +27,14 @@ verification key embedded in the link.
 
 ## Repository layout
 
-| Path                               | Purpose                                                                                                                                                         |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/mycelium/`                    | Source package (`crypto`, `protocol`, `interface`, `utils`)                                                                                                     |
-| `src/mycelium/protocol/feed.proto` | Protobuf source of truth; `feed_pb.py` is generated next to it                                                                                                  |
-| `docs/`                            | Module docs mirroring the package layout (English + optional `_zh-Hans.md` translations)                                                                        |
-| `tests/`                           | Unit tests mirroring the package layout; live platform tests in `tests/interface/`                                                                              |
-| `examples/`                        | Runnable end-to-end examples (`eg_publish.py`, `eg_subscribe.py`, `eg_changelog.py`); the generated changelog feed `ChangeLog.dat` is committed as an example   |
-| `skills/`                          | Task-oriented agent skills (`release`, `gate`, `docs-sync`, `feed-ops`, `platform-add`) — per-task workflows that reference `AGENTS.md` instead of restating it |
-| `scripts/`                         | Project scripts outside the package (`gate.py`, the one-command check-and-fix pre-submit gate; `mdtables.py`, the CJK-aware GFM table alignment checker/fixer)  |
+| Path                               | Purpose                                                                                                                                                                                                                                   |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/mycelium/`                    | Source package (`crypto`, `protocol`, `interface`, `utils`)                                                                                                                                                                               |
+| `src/mycelium/protocol/feed.proto` | Protobuf source of truth; `feed_pb.py` is generated next to it                                                                                                                                                                            |
+| `docs/`                            | Module docs mirroring the package layout (English + optional `_zh-Hans.md` translations)                                                                                                                                                  |
+| `tests/`                           | Unit tests mirroring the package layout; live platform tests in `tests/interface/`                                                                                                                                                        |
+| `examples/`                        | Runnable end-to-end examples (`eg_publish.py`, `eg_subscribe.py`, `eg_changelog.py`); the generated changelog feed `ChangeLog.dat` is committed as an example                                                                             |
+| `skills/`                          | Task-oriented agent skills (`release`, `gate`, `docs-sync`, `feed-ops`, `platform-add`) — per-task workflows that reference `AGENTS.md` instead of restating it; the gate skill also carries the project scripts (`skills/gate/scripts/`) |
 
 ## Commands
 
@@ -44,15 +43,16 @@ resolves the tool from the project environment and syncs it first if
 needed — no activated venv required. Run them from the repository root.
 Requires Python ≥ 3.12.
 
-| Task                       | Command                                                                           |
-| -------------------------- | --------------------------------------------------------------------------------- |
-| Install deps + dev tooling | `uv sync`                                                                         |
-| Lint (zero warnings)       | `uv run ruff check .`                                                             |
-| Run unit tests             | `uv run pytest`                                                                   |
-| Lint Markdown              | `uv run mdlint check --config mdlint.toml . && uv run python scripts/mdtables.py` |
-| Realign tables in place    | `uv run python scripts/mdtables.py --fix`                                         |
-| Regenerate protobuf        | `uv run buf generate`                                                             |
-| Full gate (all checks)     | `uv run python scripts/gate.py`                                                   |
+| Task                       | Command                                                                                   |
+| -------------------------- | ----------------------------------------------------------------------------------------- |
+| Install deps + dev tooling | `uv sync`                                                                                 |
+| Run unit tests             | `uv run pytest`                                                                           |
+| Regenerate protobuf        | `uv run buf generate`                                                                     |
+| Full gate (all checks)     | `uv run python skills/gate/scripts/gate.py` — or follow the `gate` skill (`skills/gate/`) |
+
+The individual lint and table-alignment steps live in the `gate` skill
+(`skills/gate/SKILL.md`) — run them through the gate or follow that
+skill's procedure.
 
 ## Architecture
 
@@ -94,8 +94,10 @@ has no personal repositories); access tokens arrive only via runtime
 arguments.
 
 **`mycelium.utils`** — Base58, the `fake64` serialization, and misc type
-helpers. Project scripts (e.g. `scripts/mdtables.py`, the CJK-aware GFM
-table alignment tool) live outside the package.
+helpers. The project scripts live with the gate skill
+(`skills/gate/scripts/`): `gate.py` (the one-command check-and-fix
+pre-submit gate) and `mdtables.py` (the CJK-aware GFM table alignment
+checker/fixer).
 
 ## Non-negotiables
 
@@ -136,7 +138,7 @@ table alignment tool) live outside the package.
   leading bold) are intentionally disabled — write natural long lines,
   `**...**` at line start, and inline HTML for any advanced feature that
   needs it; never wrap prose to a fixed width. Tables must be GFM-aligned —
-  run `uv run python scripts/mdtables.py` after editing one. Chinese
+  run `uv run python skills/gate/scripts/mdtables.py` after editing one. Chinese
   docs use corner quotes 「」 (『』 for nesting).
 - Release workflow: semantic versioning + Conventional Commits; changelog
   updates (`examples/eg_changelog.py` entries + the README "Changelog"
@@ -166,7 +168,7 @@ table alignment tool) live outside the package.
   (especially Chinese domestic LLMs). When `git status` shows it modified,
   do not inspect it, and never mention it in the next commit's **title**
   (at most a brief note in the commit body). The pre-submit gate
-  (`scripts/gate.py`) checks it but restores it afterwards — it is never
+  (`skills/gate/scripts/gate.py`) checks it but restores it afterwards — it is never
   auto-fixed.
 - Sower-identity separation: audit each push — commit authorship and
   history content. Identifiers tied to platforms in regions with stronger
@@ -245,12 +247,13 @@ table alignment tool) live outside the package.
 
 ## Before submitting
 
-Run the full gate — one command checks and auto-fixes code style, tests,
-markdown lint and table alignment (also documented in `CONTRIBUTING.md`):
+The full gate is the `gate` skill — `skills/gate/SKILL.md` covers the
+run, failure handling and the identity audit; its scripts live at
+`skills/gate/scripts/` (also documented in `CONTRIBUTING.md`):
 
-| Check           | Command                         |
-| --------------- | ------------------------------- |
-| Full gate       | `uv run python scripts/gate.py` |
+| Check           | Command                                                      |
+| --------------- | ------------------------------------------------------------ |
+| Full gate       | `uv run python skills/gate/scripts/gate.py`                  |
 
 When in doubt, read `CONTRIBUTING.md` and the module docs under `docs/`
 before changing code.

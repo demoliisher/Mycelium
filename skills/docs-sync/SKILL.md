@@ -38,13 +38,13 @@ Rules of record: `AGENTS.md` ("Conventions"). This skill restates the
   disabled, so write natural long lines and `**...**` at line start
   freely.
 - **3. Tables must be GFM-aligned**: run
-  `uv run python scripts/mdtables.py --fix` after editing any table,
-  and verify with the plain check.
+  `uv run python skills/gate/scripts/mdtables.py --fix` after editing
+  any table, and verify with the plain check.
 - **4. Changelog triple-sync** (for releases):
   - "Changelog" section of `README.md` and `README_zh-Hans.md`;
   - `examples/eg_changelog.py` entry;
   - regenerate `examples/ChangeLog.dat` with
     `uv run python examples/eg_changelog.py` — the canonical spore link
     must stay stable.
-- **5. Run the full gate** (`uv run python scripts/gate.py`) after any
-  docs change.
+- **5. Run the full gate**
+  (`uv run python skills/gate/scripts/gate.py`) after any docs change.

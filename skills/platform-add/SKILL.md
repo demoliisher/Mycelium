@@ -45,5 +45,6 @@ audit) and `docs/interface/sower/README.md` ("Adding a Platform").
 7. **Identity audit**: platform identities are permanently separate —
    identifiers tied to platforms in regions with stronger censorship
    must never surface on platforms in weaker ones.
-8. **Run the full gate** (`uv run python scripts/gate.py`) before
-   committing; follow the release skill for shipping.
+8. **Run the full gate**
+   (`uv run python skills/gate/scripts/gate.py`) before committing;
+   follow the release skill for shipping.

@@ -13,9 +13,9 @@ scanned markdown files must have its pipe characters vertically aligned by
 
 Usage:
 
-    python scripts/mdtables.py                  # check; exit 1 on any misaligned table
-    python scripts/mdtables.py --fix            # realign tables in place
-    python scripts/mdtables.py path/to/*.md     # scan specific files/dirs
+    python skills/gate/scripts/mdtables.py                  # check; exit 1 on any misaligned table
+    python skills/gate/scripts/mdtables.py --fix            # realign tables in place
+    python skills/gate/scripts/mdtables.py path/to/*.md     # scan specific files/dirs
 
 The default scan covers every ``*.md`` under the current directory except
 tool and artifact directories (``.venv``, ``.git``, ``.pytest_cache``,
@@ -283,7 +283,7 @@ def fix_text(text: str) -> tuple[int, str]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="python scripts/mdtables.py",
+        prog="python skills/gate/scripts/mdtables.py",
         description=(
             "Check or realign GFM tables in markdown files "
             "(the MD060 'aligned' style, CJK-width aware)."
@@ -319,7 +319,7 @@ def main(argv: list[str] | None = None) -> int:
     if not args.fix and issues:
         print(
             f"\n{issues} misaligned table(s); "
-            "run 'python scripts/mdtables.py --fix' to realign"
+            "run 'python skills/gate/scripts/mdtables.py --fix' to realign"
         )
         return 1
     return 0

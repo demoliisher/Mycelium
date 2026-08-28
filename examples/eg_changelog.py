@@ -14,7 +14,7 @@ The feed's mycelium link — ``ChangeLog.dat`` lives at
 ``examples/ChangeLog.dat`` in this repository (demoliisher/Mycelium on
 GitHub) — hardcoded here in comment form:
 
-    # mycelium://8pFEkFBqrQWgw6OzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPwwzK1DEByGpqtRpmmD+Bqbvcx9uoWx9M9zqkiN8rRSSmnZ2BHEozf2enAagKTNG=
+    # mycelium://8pFEkFBqrQWgw6OzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPwwzK1DEByGpqtRpmmD/Bqbvcx9uoWx9M9zqkiN8rRSSmnZ2BHEozf2enAagKTNG=
 
 This script doubles as a usage example of ``mycelium.crypto`` and
 ``mycelium.protocol``.
@@ -31,6 +31,14 @@ from mycelium.protocol import Sclerotium, Spore
 # Changelog entries, in order: (semantic version, entry text). Append new
 # ones here; entries already present are skipped on subsequent runs.
 entries = [
+    (
+        "0.6.0",
+        "The project scripts move into the gate skill "
+        "(skills/gate/scripts/: gate.py, mdtables.py) and the top-level "
+        "scripts/ directory is gone; AGENTS.md slims down — the command "
+        "table and the pre-submit section now point at the gate skill "
+        "instead of restating the steps",
+    ),
     (
         "0.5.0",
         "The git write path no longer needs a git executable: GitPusher "

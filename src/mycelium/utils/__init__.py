@@ -11,8 +11,8 @@ Utility package: shared low-level helpers.
 - ``typetools``: timestamp and minimal big-endian integer serialization
   used by the protocol payloads.
 
-Project scripts (e.g. the GFM table alignment tool) live in ``scripts/``
-at the repository root, outside the package.
+Project scripts (e.g. the GFM table alignment tool) live with the gate
+skill at ``skills/gate/scripts/``, outside the package.
 """
 
 __all__ = [

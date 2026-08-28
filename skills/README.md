@@ -16,7 +16,7 @@ directory directly.
 | Skill                                   | Purpose                                                                                                                        |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | [`release`](release/SKILL.md)           | Full release workflow: version bump, changelog triple-sync, gate, identity audit, mandatory user approval, commit + tag + push |
-| [`gate`](gate/SKILL.md)                 | Pre-submit gate: run check-and-fix, handle failures, identity audit                                                            |
+| [`gate`](gate/SKILL.md)                 | Pre-submit gate: run check-and-fix, handle failures, identity audit; carries the project scripts (`gate/scripts/`)             |
 | [`docs-sync`](docs-sync/SKILL.md)       | Documentation sync: EN source of truth, zh-Hans mirror, tables, changelog, classical-Chinese no-go zone                        |
 | [`feed-ops`](feed-ops/SKILL.md)         | Feed operations: publish/subscribe examples, PEM keys, spore-link verification rules                                           |
 | [`platform-add`](platform-add/SKILL.md) | Add a storage backend: git-hosting platform (`GitPlatformClient`) or non-git service (`Storage`)                               |
@@ -31,4 +31,4 @@ directory directly.
   name** exactly (no `mycelium-` prefix) — skill loaders and editors
   warn when they diverge.
 - Markdown in this directory is linted by the gate — run
-  `uv run python scripts/gate.py` after editing.
+  `uv run python skills/gate/scripts/gate.py` after editing.

@@ -107,8 +107,18 @@ platform clients:
 - [github](src/mycelium/interface/sower/github.py) — `GithubClient`: GitHub REST publisher — Bearer auth, single PUT contents endpoint, optional jsDelivr CDN acceleration.
 - [cnb](src/mycelium/interface/sower/cnb.py) — `CnbClient`: CNB (cnb.cool) publisher — organization-based repositories, git-push writes (no contents API), no fork API.
 - [crypto](src/mycelium/crypto/) — deterministic cryptography: SHA-2/SHA-3 family wrappers, Ed25519, AES-256-GCM, and the `Config` key bundle.
-- [mdtables](scripts/mdtables.py) — CJK-aware GFM table alignment checker/fixer (`python scripts/mdtables.py [--fix]`).
-- [gate](scripts/gate.py) — one-command pre-submit gate: checks and auto-fixes code style (ruff), tests (pytest), markdown lint (mdlint) and table alignment (mdtables).
+- [mdtables](skills/gate/scripts/mdtables.py) — CJK-aware GFM table alignment checker/fixer (`uv run python skills/gate/scripts/mdtables.py [--fix]`).
+- [gate](skills/gate/scripts/gate.py) — one-command pre-submit gate: checks and auto-fixes code style (ruff), tests (pytest), markdown lint (mdlint) and table alignment (mdtables).
+
+### Platform overview
+
+| Product           | Origin | File direct link reachable in mainland China | Review intensity |
+| ----------------- | ------ | -------------------------------------------- | ---------------- |
+| Gitee             | PRC    | ✅                                           | 🔴 Strong        |
+| GitCode / AtomGit | PRC    | ✅                                           | 🔴 Strong        |
+| GitHub            | USA    | ❌                                           | 🟢 Weak          |
+| CNB               | PRC    | ✅                                           | 🔴 Strong        |
+| jsDelivr          | Poland | ✅                                           | 🟢 Weak          |
 
 ## Quick Start
 
@@ -144,11 +154,16 @@ The changelog feed's example link (its feed is the committed
 `examples/ChangeLog.dat` in this repository):
 
 ```text
-mycelium://8pFEkFBqrQWgw6IzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPwwzK1DEByGpqtRpmmDIBqbvcx9uoWx9M9zqkiN8rRSSmnZ2BHEozf2enAagKTNG=
+mycelium://8pFEkFBqrQWgw6OzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPwwzK1DEByGpqtRpmmD/Bqbvcx9uoWx9M9zqkiN8rRSSmnZ2BHEozf2enAagKTNG=
 ```
 
 ## Changelog
 
+- **0.6.0** — The project scripts move into the `gate` skill
+  (`skills/gate/scripts/`: `gate.py`, `mdtables.py`) and the top-level
+  `scripts/` directory is gone; `AGENTS.md` slims down — the command
+  table and the pre-submit section now point at the `gate` skill
+  (`skills/gate/`) instead of restating the steps.
 - **0.5.0** — The git write path no longer needs a `git` executable:
   `GitPusher` (`sower/git.py`, dulwich-based) builds the commit in memory
   and pushes over the git smart HTTP protocol — no clone, no working tree,

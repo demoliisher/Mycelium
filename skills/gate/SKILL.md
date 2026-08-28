@@ -19,13 +19,14 @@ Ground rules: `AGENTS.md` ("Before submitting") and `CONTRIBUTING.md`.
 
 ## Procedure
 
-- **1. Run the gate**: `uv run python scripts/gate.py` from the
-  repository root. It runs, in order:
+- **1. Run the gate**: `uv run python skills/gate/scripts/gate.py`
+  from the repository root — the project scripts live in this skill's
+  `scripts/` directory. It runs, in order:
   - `uv run ruff check . --fix` (code style, auto-fixed);
   - `uv run pytest -q` (unit tests; must end green);
   - `uv run mdlint check --config mdlint.toml . --fix` (markdown lint);
-  - `uv run python scripts/mdtables.py --fix` + verify (GFM table
-    alignment).
+  - `uv run python skills/gate/scripts/mdtables.py --fix` + verify (GFM
+    table alignment).
 - **2. On failure**, fix the flagged issue and re-run the whole gate:
   - lint errors the gate cannot auto-fix (e.g. MD034 bare URLs — wrap
     in `<...>`) must be fixed by hand;
