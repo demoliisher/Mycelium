@@ -149,6 +149,13 @@ mycelium://8pFEkFBqrQWgw6IzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPw
 
 ## Changelog
 
+- **0.4.0** — CNB module: the commit identity is now resolved from the
+  platform API — the profile username (`GET /user`) with the git commit
+  email (`GET /user/emails`, `account-email:r` scope; profile email as
+  fallback) — and the `git_author` parameter and the neutral fallback
+  identity are gone. The module docs are restructured into per-module
+  files with `README.md` package overviews (crypto: Hash/AES/EdDSA,
+  protocol: core/spore, sower: one document per platform).
 - **0.3.0** — Add `skills/`: task-oriented agent workflows (`release`,
   `gate`, `docs-sync`, `feed-ops`, `platform-add`) that reference
   `AGENTS.md` instead of restating it.

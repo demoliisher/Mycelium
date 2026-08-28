@@ -90,6 +90,7 @@ mycelium://8pFEkFBqrQWgw6IzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPw
 
 ## 更新日志
 
+- **0.4.0**——CNB 模块：提交身份改由平台 API 解析——`GET /user` 的资料用户名 + `GET /user/emails` 的 git 提交邮箱（`account-email:r` 权限；降级资料邮箱）——`git_author` 参数与中性保底身份已移除。模块文档重构为「包总览 `README.md` + 每模块一文档」（crypto：Hash/AES/EdDSA；protocol：core/spore；sower：每平台一文档）。
 - **0.3.0**——新增 `skills/` 目录：面向任务的代理工作流（release / gate / docs-sync / feed-ops / platform-add），引用 AGENTS.md 而非复述规则。
 - **0.2.4**——CNB 模块文档与 AGENTS.md 链接官方参考（OpenAPI、cnb-skill 仓库、平台文档）。
 - **0.2.3**——CNB 模块：记录官方 OpenAPI 约束——`root_group_protection` 只读（仅网页可改）、子组织只读（根组织年度配额无法绕过）、git 写仅限 blobs（真 git push 是唯一写入途径）、`x-cnb-identity-ticket` 头管控四类删除。

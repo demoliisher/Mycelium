@@ -32,6 +32,16 @@ from mycelium.protocol import Sclerotium, Spore
 # ones here; entries already present are skipped on subsequent runs.
 entries = [
     (
+        "0.4.0",
+        "CNB module: the commit identity now comes from the platform API "
+        "(profile username + git commit email via the account-email:r scope, "
+        "profile email as fallback — the git_author parameter and the "
+        "neutral fallback identity are gone); restructure the module docs "
+        "into per-module files with README package overviews (crypto: "
+        "Hash/AES/EdDSA, protocol: core/spore, sower: one document per "
+        "platform)",
+    ),
+    (
         "0.3.0",
         "Add the skills/ directory — task-oriented agent workflows "
         "(release, gate, docs-sync, feed-ops, platform-add) that reference "

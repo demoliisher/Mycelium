@@ -88,13 +88,17 @@ issue.
 
 ## Documentation
 
-Module documentation lives in `docs/`, mirroring the package layout
-(`docs/crypto/`, `docs/interface/sower/`, ...). The English
-`README.md` is **required** — it is the source of truth. Translations are
-**optional**: you are welcome to add or update one (Simplified Chinese
-uses the `README_zh-Hans.md` naming; other languages follow the same
-`<lang>` suffix pattern). If a translation exists, keep it in sync with
-the English original.
+Module documentation lives in `docs/`, mirroring the package layout: a
+package with sub-modules gets a folder with a `README.md` overview plus
+one document per module named after it (`docs/crypto/README.md` +
+`Hash.md`/`AES.md`/`EdDSA.md`; the sower platform documents live at
+`docs/interface/sower/<platform>.md`), while a module without sub-modules
+is a single file (`docs/interface/picker.md`). The English file is
+**required** — it is the source of truth. Translations are **optional**:
+you are welcome to add or update one (Simplified Chinese uses the
+`<module>_zh-Hans.md` naming; other languages follow the same `<lang>`
+suffix pattern). If a translation exists, keep it in sync with the
+English original.
 
 Every documentation change must pass:
 

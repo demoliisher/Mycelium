@@ -23,9 +23,9 @@
 #
 # fix = false  never auto-modify files during `uv run mdlint check`
 #
-# All documentation lives under `docs/` (bilingual: `README.md` +
-# `README_zh-Hans.md`, both committed). `uv run mdlint check --config
-# mdlint.toml .` covers every Markdown file in the repository.
+# All documentation lives under `docs/` (bilingual: `README.md` package
+# overview + `<module>.md` per sub-module, translations `<module>_zh-Hans.md`).
+# `uv run mdlint check --config mdlint.toml .` covers every Markdown file.
 
 fix = false
 

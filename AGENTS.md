@@ -114,8 +114,12 @@ table alignment tool) live outside the package.
 - Module files carry the header `# Copyright (c) 2026 demoliisher` +
   `# SPDX-License-Identifier: MIT`.
 - Docstrings are rich and narrative; docs live in `docs/` mirroring the
-  package layout. The English `README.md` is the source of truth;
-  `_zh-Hans.md` translations are optional but must stay in sync.
+  package layout: a package with sub-modules gets a folder with a
+  `README.md` overview plus one document per module named after it (the
+  sower platform documents live at `docs/interface/sower/<platform>.md`);
+  a module without sub-modules is a single file. The English file is the
+  source of truth; `<module>_zh-Hans.md` translations are optional but
+  must stay in sync.
 - Tests are `unittest`-style classes collected by pytest (`testpaths =
   ["tests"]`). The `live_*.py` platform tests are **not** collected — do
   not rename them to `test_*.py`.
