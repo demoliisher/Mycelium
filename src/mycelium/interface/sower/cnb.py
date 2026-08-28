@@ -67,7 +67,6 @@ after the push — it never appears in a URL or on the command line.
 from __future__ import annotations
 
 import os
-import re
 import subprocess
 import sys
 import tempfile
@@ -85,11 +84,6 @@ __all__ = ["CnbClient"]
 # The CNB git remote authenticates with the fixed username ``cnb`` and the
 # access token as the password (see docs.cnb.cool/guide/access-token).
 _GIT_USERNAME = "cnb"
-
-# Neutral commit identity used on the feed repository unless ``git_author``
-# is given; sowers should pick an identity that cannot be linked back to
-# their other platform personas (see AGENTS.md).
-_DEFAULT_GIT_AUTHOR = "Mycelium Sower <sower@mycelium.local>"
 
 # A push can take a while on slow links; bound every git subprocess call.
 _GIT_TIMEOUT = 300.0
@@ -120,8 +114,12 @@ class CnbClient(GitPlatformClient):
 
     ``visibility`` selects the repository visibility on creation
     (``public`` / ``private`` / ``secret``; CNB defaults to ``public``).
-    ``git_author`` is the commit identity written into the feed repository's
-    git history, as ``"Name <email>"``.
+    The commit identity written into the feed repository's git history
+    comes from the platform API: the profile username (``GET /user``) with
+    the platform's git commit email (``GET /user/emails`` — needs the
+    ``account-email:r`` scope; without that scope the profile email from
+    ``GET /user`` is used). If no username or email can be resolved the
+    push fails — there is no fallback identity and no identity parameter.
     """
 
     BASE_URL = "https://api.cnb.cool"
@@ -136,7 +134,6 @@ class CnbClient(GitPlatformClient):
         group: str | None = None,
         branch: str | None = None,
         visibility: str = "public",
-        git_author: str | None = None,
         poll_interval: float = 1.0,
         max_poll: int = 30,
     ):
@@ -164,19 +161,12 @@ class CnbClient(GitPlatformClient):
             # auto-created when missing (see _ensure_group).
             self.group = group
         self.visibility = visibility
-        self.git_author = git_author or _DEFAULT_GIT_AUTHOR
-        match = re.match(r"^(?P<name>.+?)\s*<(?P<email>[^<>]+)>$", self.git_author)
-        if not match:
-            raise ValueError(
-                f"git_author must look like 'Name <email>', got {self.git_author!r}"
-            )
-        self._git_name = match.group("name").strip()
-        self._git_email = match.group("email").strip()
         self.branch = branch or self.default_branch
         self.poll_interval = poll_interval
         self.max_poll = max_poll
         self.session = requests.Session()
         self._namespace: str | None = None  # lazy cache of the namespace
+        self._profile_data: dict | None = None  # lazy cache of GET /user
 
     @property
     def base_url(self) -> str:
@@ -200,7 +190,7 @@ class CnbClient(GitPlatformClient):
             if self.group is None:
                 self._resolve_group()  # fetches /user for the username
             else:
-                self._request("GET", "/user")  # validate the token early
+                self._profile()  # validate the token early
             self._namespace = self.group
         return self._namespace
 
@@ -215,6 +205,53 @@ class CnbClient(GitPlatformClient):
         response = self.session.request(method, url, headers=headers, **kwargs)
         response.raise_for_status()
         return response
+
+    def _profile(self) -> dict:
+        """The authorized user's profile (``GET /user``), fetched once and cached."""
+        if self._profile_data is None:
+            self._profile_data = self._request("GET", "/user").json()
+        return self._profile_data
+
+    def _git_identity(self) -> tuple[str, str]:
+        """
+        The commit identity (name, email) for the feed repository, from the CNB API.
+
+        The name is the profile username (``GET /user``). The email is the
+        platform's git commit email (``GET /user/emails`` — its ``email``
+        field, which needs the ``account-email:r`` scope), falling back to
+        the profile email (``GET /user``) when that scope is missing.
+
+        Raises:
+            ValueError: when no username or no email can be resolved —
+                there is no fallback identity; fix the token scope
+                (``account-email:r``) or the account's email settings
+                instead of pushing with a made-up identity.
+        """
+        profile = self._profile()
+        username = profile.get("username")
+        if not username:
+            raise ValueError(
+                "cannot determine the CNB commit identity: the profile "
+                f"(GET /user) has no username: {profile}"
+            )
+        email = profile.get("email")
+        try:
+            resp = self._request("GET", "/user/emails")
+        except requests.exceptions.HTTPError as e:
+            if e.response is None or e.response.status_code != 403:
+                raise  # account-email:r missing -> use the profile email
+        else:
+            data = resp.json()
+            if isinstance(data, dict) and data.get("email"):
+                email = data["email"]
+        if not email:
+            raise ValueError(
+                "cannot determine the CNB commit identity: neither the git "
+                "commit email (GET /user/emails, needs the account-email:r "
+                "scope) nor the profile email (GET /user) is set for this "
+                "account"
+            )
+        return username, email
 
     def _resolve_group(self) -> str:
         """Resolve the organization path, deriving it from the profile when ``group`` was omitted.
@@ -234,7 +271,7 @@ class CnbClient(GitPlatformClient):
         The profile call (``GET /user``) also validates the token early.
         """
         if self.group is None:
-            data = self._request("GET", "/user").json()
+            data = self._profile()
             username = _profile_username(data)
             orgs = self._list_groups()
             if orgs is not None:
@@ -525,6 +562,7 @@ class CnbClient(GitPlatformClient):
     ) -> dict:
         """Clone the target, overwrite ``file_path``, commit and push."""
         self._resolve_group()
+        git_name, git_email = self._git_identity()
         remote = f"https://cnb.cool/{self.group}/{self.repo}"
         cred = self._write_credential_file()
         try:
@@ -540,8 +578,8 @@ class CnbClient(GitPlatformClient):
                         self._git(cred, "checkout", self.branch, cwd=workdir)
                     except subprocess.CalledProcessError:
                         self._git(cred, "checkout", "-b", self.branch, cwd=workdir)
-                self._git(cred, "config", "user.name", self._git_name, cwd=workdir)
-                self._git(cred, "config", "user.email", self._git_email, cwd=workdir)
+                self._git(cred, "config", "user.name", git_name, cwd=workdir)
+                self._git(cred, "config", "user.email", git_email, cwd=workdir)
                 target = os.path.join(workdir, file_path)
                 parent = os.path.dirname(target)
                 if parent:

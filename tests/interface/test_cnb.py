@@ -181,19 +181,77 @@ class TestConstructor(unittest.TestCase):
             with self.assertRaises(ValueError):
                 CnbClient("t", repo="a", group="g", visibility=bad)
 
-    def test_git_author_default(self):
+
+class TestGitIdentity(unittest.TestCase):
+    """The commit identity comes from the platform API (no git_author param)."""
+
+    def _client(self, profile, emails=None, emails_status=200):
         client = CnbClient("t", repo="a", group="g")
-        self.assertEqual(client._git_name, "Mycelium Sower")
-        self.assertEqual(client._git_email, "sower@mycelium.local")
+        client._namespace = "g"
+        calls = []
 
-    def test_git_author_custom(self):
-        client = CnbClient("t", repo="a", group="g", git_author="Horse <h@e.x>")
-        self.assertEqual(client._git_name, "Horse")
-        self.assertEqual(client._git_email, "h@e.x")
+        def handler(method, endpoint, **kwargs):
+            calls.append((method, endpoint))
+            if method == "GET" and endpoint == "/user":
+                return _Resp(200, profile)
+            if method == "GET" and endpoint == "/user/emails":
+                return _Resp(emails_status, emails if emails is not None else {})
+            raise AssertionError(f"unexpected call: {method} {endpoint}")
 
-    def test_bad_git_author_raises(self):
+        client._request = mock.Mock()
+        attach(client, handler)
+        client._calls = calls
+        return client
+
+    def test_git_commit_email_wins(self):
+        """/user/emails (account-email:r) provides the git commit email."""
+        client = self._client(
+            {"username": "u", "email": "profile@x"},
+            {"email": "git@x", "emails": ["git@x", "profile@x"]},
+        )
+        self.assertEqual(client._git_identity(), ("u", "git@x"))
+
+    def test_missing_scope_degrades_to_profile_email(self):
+        """403 on /user/emails -> the profile email (GET /user)."""
+        client = self._client({"username": "u", "email": "profile@x"}, emails_status=403)
+        self.assertEqual(client._git_identity(), ("u", "profile@x"))
+
+    def test_no_email_raises(self):
+        """No email anywhere -> ValueError (there is no fallback identity)."""
+        client = self._client({"username": "u"}, {"email": ""})
         with self.assertRaises(ValueError):
-            CnbClient("t", repo="a", group="g", git_author="no-angle-brackets")
+            client._git_identity()
+
+    def test_no_username_raises(self):
+        """No username -> ValueError, before the emails lookup even runs."""
+        client = self._client({}, emails_status=403)
+        with self.assertRaises(ValueError):
+            client._git_identity()
+
+    def test_missing_scope_and_empty_profile_email_raises(self):
+        """403 on /user/emails with an empty profile email -> ValueError."""
+        client = self._client({"username": "u", "email": ""}, emails_status=403)
+        with self.assertRaises(ValueError):
+            client._git_identity()
+
+    def test_emails_other_error_raises(self):
+        """A non-403 /user/emails failure propagates."""
+        client = self._client({"username": "u", "email": "p@x"}, emails_status=500)
+        with self.assertRaises(requests.exceptions.HTTPError):
+            client._git_identity()
+
+    def test_profile_fetched_once(self):
+        """GET /user is cached; /user/emails is re-fetched per call."""
+        client = self._client({"username": "u", "email": "p@x"}, emails_status=403)
+        client._git_identity()
+        client._git_identity()
+        self.assertEqual(
+            client._calls.count(("GET", "/user")), 1, "profile must be cached"
+        )
+        self.assertEqual(
+            client._calls.count(("GET", "/user/emails")), 2,
+            "emails must be re-fetched per push",
+        )
 
 
 class TestNamespace(unittest.TestCase):
@@ -505,6 +563,23 @@ class TestEnsureRepoExists(unittest.TestCase):
 
 
 class TestPush(unittest.TestCase):
+    def _identity(self, handler):
+        """Wrap a push-test handler with the profile/emails endpoints.
+
+        Push now resolves the commit identity from the API: ``GET /user``
+        (profile) and ``GET /user/emails`` (git commit email; answered 403
+        here, so the profile email ``r@e.x`` is used).
+        """
+
+        def wrapped(method, endpoint, **kwargs):
+            if method == "GET" and endpoint == "/user":
+                return _Resp(200, {"username": "rainbow", "email": "r@e.x"})
+            if method == "GET" and endpoint == "/user/emails":
+                return _Resp(403, {})  # account-email:r missing -> profile email
+            return handler(method, endpoint, **kwargs)
+
+        return wrapped
+
     def test_push_creates_file(self):
         """Missing file -> 'Create file ...' message; git flow runs to a push."""
         client = make_client()
@@ -516,7 +591,7 @@ class TestPush(unittest.TestCase):
                 return _Resp(404, {})  # missing file
             raise AssertionError(f"unexpected call: {method} {endpoint}")
 
-        attach(client, handler)
+        attach(client, self._identity(handler))
         git = _Git(stdout="new-sha")
         client._git = git
         result = client.push("feed.dat", b"hello")
@@ -530,6 +605,9 @@ class TestPush(unittest.TestCase):
         self.assertIn(("commit", "-m", "Create file feed.dat"), commands)
         push_call = next(args for args in commands if args[0] == "push")
         self.assertEqual(push_call[-1], "HEAD:main")
+        # The commit identity comes from the platform API, not local git.
+        self.assertIn(("config", "user.name", "rainbow"), commands)
+        self.assertIn(("config", "user.email", "r@e.x"), commands)
 
     def test_push_updates_file(self):
         """Existing file -> 'Update file ...' message; sha lookup succeeded."""
@@ -542,7 +620,7 @@ class TestPush(unittest.TestCase):
                 return _Resp(200, {"type": "blob", "sha": "old-sha"})
             raise AssertionError(f"unexpected call: {method} {endpoint}")
 
-        attach(client, handler)
+        attach(client, self._identity(handler))
         git = _Git()
         client._git = git
         client.push("feed.dat", b"world")
@@ -558,7 +636,7 @@ class TestPush(unittest.TestCase):
                 return _Resp(200, {"type": "blob", "sha": "s"})
             raise AssertionError(f"unexpected call: {method} {endpoint}")
 
-        attach(client, handler)
+        attach(client, self._identity(handler))
         git = _Git()
         client._git = git
         client.push("feed.dat", b"x", commit_message="publish v1")
@@ -573,7 +651,7 @@ class TestPush(unittest.TestCase):
                 return _Resp(404, {})
             raise AssertionError(f"unexpected call: {method} {endpoint}")
 
-        attach(client, handler)
+        attach(client, self._identity(handler))
         git = _Git()
         client._git = git
         client.push("feed.dat", b"x")
@@ -599,7 +677,7 @@ class TestPush(unittest.TestCase):
                 return _Resp(404, {})
             raise AssertionError(f"unexpected call: {method} {endpoint}")
 
-        attach(client, handler)
+        attach(client, self._identity(handler))
         git = _Git()
         client._git = git
 
@@ -624,7 +702,7 @@ class TestPush(unittest.TestCase):
                 return _Resp(404, {})
             raise AssertionError(f"unexpected call: {method} {endpoint}")
 
-        attach(client, handler)
+        attach(client, self._identity(handler))
         state = {"n": 0}
 
         def flaky_git(cred, *args, cwd=None):
@@ -650,7 +728,7 @@ class TestPush(unittest.TestCase):
                 return _Resp(404, {})
             raise AssertionError(f"unexpected call: {method} {endpoint}")
 
-        attach(client, handler)
+        attach(client, self._identity(handler))
         state = {"n": 0}
 
         def bad_git(cred, *args, cwd=None):
@@ -670,9 +748,11 @@ class TestPush(unittest.TestCase):
 
         def handler(method, endpoint, **kwargs):
             if method == "GET" and endpoint == "/user":
-                return _Resp(200, {"username": "rainbow"})
+                return _Resp(200, {"username": "rainbow", "email": "r@e.x"})
             if method == "GET" and endpoint == "/user/groups":
                 return _Resp(200, [{"path": "spare", "sub_repo_count": 0}])
+            if method == "GET" and endpoint == "/user/emails":
+                return _Resp(403, {})  # account-email:r missing -> profile email
             if method == "GET" and endpoint.endswith("/contents/feed.dat"):
                 return _Resp(404, {})
             raise AssertionError(f"unexpected call: {method} {endpoint}")
