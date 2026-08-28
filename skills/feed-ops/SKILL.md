@@ -1,9 +1,9 @@
 ---
-name: mycelium-feed-ops
+name: feed-ops
 description: Operate Mycelium feeds — publish/subscribe with the examples, PEM key handling, spore-link verification rules (never compare export strings).
 ---
 
-# mycelium-feed-ops
+# feed-ops
 
 Daily feed operations: publishing a feed (sower side), subscribing
 (picker side), and maintaining the changelog feed. Use the examples as

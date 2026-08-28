@@ -1,9 +1,9 @@
 ---
-name: mycelium-release
+name: release
 description: Mycelium release workflow — version decision, changelog sync, gate, identity audit, mandatory user approval, commit + tag + push.
 ---
 
-# mycelium-release
+# release
 
 Run this skill whenever a release (tagged push) is requested or when
 uncommitted work needs to ship. It encodes the full release SOP so any

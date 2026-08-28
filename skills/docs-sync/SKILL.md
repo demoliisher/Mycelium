@@ -1,9 +1,9 @@
 ---
-name: mycelium-docs-sync
+name: docs-sync
 description: Keep Mycelium documentation in sync — English source of truth, zh-Hans translation, table alignment, changelog triple-sync, classical-Chinese no-go zone.
 ---
 
-# mycelium-docs-sync
+# docs-sync
 
 Mycelium documentation follows strict sync rules. This skill is the
 checklist for editing any documentation: when to touch which file, how
@@ -17,8 +17,13 @@ Rules of record: `AGENTS.md` ("Conventions"). This skill restates the
 - `README.md` (EN) — the **source of truth**; write content here first.
 - `README_zh-Hans.md` — translation; must stay in sync (corner quotes
   「」, 『』 for nesting).
-- `docs/` — module docs mirroring `src/mycelium/`; each package's design
-  lives here (EN + optional `_zh-Hans.md`).
+- `docs/` — module docs mirroring `src/mycelium/`; a package with
+  sub-modules gets a folder with a `README.md` overview plus one document
+  per module named after it (`docs/crypto/README.md` + `Hash.md`; the
+  sower platform documents live at `docs/interface/sower/<platform>.md`),
+  a module without sub-modules is a single file
+  (`docs/interface/picker.md`). EN is the source of truth, translations
+  are `<module>_zh-Hans.md` and must stay in sync.
 - `README_zh-lzh.md` (classical Chinese) — **author-only**. Never read,
   edit, lint, diff or review it; its wording can trip LLM content-safety
   mechanisms. If `git status` shows it modified, leave it alone and never

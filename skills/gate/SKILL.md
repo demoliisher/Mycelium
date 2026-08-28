@@ -1,9 +1,9 @@
 ---
-name: mycelium-gate
+name: gate
 description: Pre-submit gate for Mycelium — run the one-command check-and-fix gate, handle failures, and audit identity before any commit.
 ---
 
-# mycelium-gate
+# gate
 
 Run before every commit or push. The gate is a single command that
 checks code style, unit tests, markdown lint and table alignment, and

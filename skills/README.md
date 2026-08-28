@@ -27,5 +27,8 @@ directory directly.
   module docs before executing.
 - Keep each skill focused; add a new one only when a recurring job has
   enough steps to be worth encoding.
+- The frontmatter `name` and the `#` heading must **match the folder
+  name** exactly (no `mycelium-` prefix) — skill loaders and editors
+  warn when they diverge.
 - Markdown in this directory is linted by the gate — run
   `uv run python scripts/gate.py` after editing.

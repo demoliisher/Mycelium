@@ -1,9 +1,9 @@
 ---
-name: mycelium-platform-add
+name: platform-add
 description: Add a new storage backend to Mycelium — a git-hosting platform (subclass GitPlatformClient) or a non-git storage service (subclass Storage) — with contract, docs, live tests and identity audit.
 ---
 
-# mycelium-platform-add
+# platform-add
 
 Mycelium is **not git-only**: the sower side supports git-hosting
 platforms (Gitee, GitCode, GitHub, CNB) *and* plain storage services
