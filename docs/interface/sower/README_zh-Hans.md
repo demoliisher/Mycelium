@@ -214,6 +214,14 @@ Hypha(session=TokenSession()).pull(link)
 
 注意：CNB 对根组织的创建有年度配额，且**网页与 API 共用该配额**（配额耗尽后网页创建同样返回 HTTP 429，删除组织也不会释放）——若自动创建报 HTTP 429，需等待配额恢复或由平台管理员创建组织，再将其路径作为 `group` 传入（省略 `group` 时模块会优先复用已有的空组织，仅在无可用组织时才新建）。
 
+## CNB 参考资料 CNB References
+
+CNB 是小众平台、资料零散，以下官方来源供贡献者（人类或 AI）核对 API 行为：
+
+- 官方 OpenAPI：<https://api.cnb.cool/swagger.json>——端点清单、权限范围与请求/响应结构
+- 官方 Skills / cnb-cli 源码：<https://cnb.cool/cnb/skills/cnb-skill>——生成的 OpenAPI 客户端（MIT），端点形态与载荷的便捷参考
+- 平台文档：<https://docs.cnb.cool/>
+
 ## 添加平台 Adding a Platform
 
 对于另一个 git 托管平台，在 `gitee.py` 旁新增同级模块（如 `gitlab.py`），继承 `GitPlatformClient` 并实现完整契约（构造函数、类属性与上面列出的每个抽象方法）；

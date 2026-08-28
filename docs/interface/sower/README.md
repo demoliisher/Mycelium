@@ -371,6 +371,18 @@ when the quota allows or by the platform admin, and its path passed as
 organization without repositories first, so a new one is only created
 when nothing is available).
 
+## CNB References
+
+CNB is a niche platform with scattered docs; the following official
+sources help contributors (human or AI) verify API behavior:
+
+- Official OpenAPI spec: <https://api.cnb.cool/swagger.json> — endpoint
+  list, permission scopes and request/response schemas
+- Official Skills / cnb-cli source: <https://cnb.cool/cnb/skills/cnb-skill>
+  — the generated OpenAPI client (MIT), a handy reference for endpoint
+  shapes and payloads
+- Platform docs: <https://docs.cnb.cool/>
+
 ## Adding a Platform
 
 For another git-hosting platform, subclass `GitPlatformClient` in a sibling

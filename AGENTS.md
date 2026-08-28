@@ -196,7 +196,10 @@ table alignment tool) live outside the package.
   when empty, and deleting orgs does not free the yearly creation quota —
   treat root organizations as a scarce yearly resource: do not delete
   them unless necessary. The official OpenAPI spec
-  (<https://api.cnb.cool/swagger.json>) confirms the platform constraints:
+  (<https://api.cnb.cool/swagger.json>) confirms the platform constraints;
+  the official cnb-skill repository (<https://cnb.cool/cnb/skills/cnb-skill>)
+  mirrors that spec as a generated OpenAPI client (MIT) — a convenient
+  reference for endpoint shapes:
   `root_group_protection` is read-only (absent from the `PUT
   /{slug}/-/settings` body — web-only), sub-organizations are read-only
   (`GET /user/groups/{slug}`, `GET /{slug}/-/sub-groups`; no create
