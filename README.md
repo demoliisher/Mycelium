@@ -149,6 +149,11 @@ mycelium://8pFEkFBqrQWgw6IzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPw
 
 ## Changelog
 
+- **0.5.0** — The git write path no longer needs a `git` executable:
+  `GitPusher` (`sower/git.py`, dulwich-based) builds the commit in memory
+  and pushes over the git smart HTTP protocol — no clone, no working tree,
+  no credential store. CNB's `push` uses it; Gitee/GitCode/GitHub gain an
+  optional git-push backup mode when the contents API write fails.
 - **0.4.0** — CNB module: the commit identity is now resolved from the
   platform API — the profile username (`GET /user`) with the git commit
   email (`GET /user/emails`, `account-email:r` scope; profile email as

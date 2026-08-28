@@ -354,6 +354,11 @@ class GitCodeClient(GitPlatformClient):
                 if attempt + 1 < self._WRITE_RETRIES and self._is_fork_race(e):
                     time.sleep(self._WRITE_BACKOFF * (attempt + 1))
                     continue
+                # The contents API write failed: fall back to a real git
+                # push (backup mode) when a commit identity is resolvable.
+                backup = self._push_git_backup(file_path, content_bytes, commit_message)
+                if backup is not None:
+                    return backup
                 raise
         assert response is not None
         return response.json()
@@ -401,6 +406,39 @@ class GitCodeClient(GitPlatformClient):
                 )
             return None
         return data.get("sha")
+
+    # ---------- optional git-push backup mode ----------
+
+    def _git_identity(self) -> tuple[str, str] | None:
+        """The (name, email) commit identity for the git-push backup mode.
+
+        Resolved from the GitCode profile (``GET /user``): the login and
+        the profile email. When the profile is unreachable or lacks an
+        email there is no fallback identity — returns None so ``push``
+        re-raises the original API error.
+        """
+        try:
+            data = self._request("GET", "/user").json()
+        except requests.exceptions.HTTPError:
+            return None
+        login = data.get("login")
+        email = data.get("email") or ""
+        if not login or not email:
+            return None
+        return login, email
+
+    def _git_remote(self) -> tuple[str, str, str] | None:
+        """The (url, username, password) git remote for the backup push.
+
+        GitCode's HTTPS git endpoint accepts the account login with the
+        access token as the password (``host`` selects gitcode.com or
+        atomgit.com).
+        """
+        return (
+            f"https://{self.host}/{self.namespace}/{self.repo}",
+            self.namespace,
+            self.access_token,
+        )
 
 
 if __name__ == "__main__":

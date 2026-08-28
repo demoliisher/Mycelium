@@ -27,7 +27,15 @@ Its feature set otherwise matches `GiteeClient`:
 
 Platform quirks: GitHub's contents API replies **HTTP 404** for a missing
 file, and a fork materializes asynchronously — a write issued right after
-forking can transiently fail (409/422) and is retried briefly.
+forking can transiently fail (409/422) and is retried briefly. When the
+contents write fails after the transient-race retries, `push` falls back
+to a **real git push** through the pure-Python [git push backend](git.md)
+(`GitPusher`) — the commit identity comes from the GitHub profile (the
+login with the profile email, else the primary email from `GET
+/user/emails`, else GitHub's anonymous `users.noreply.github.com` mailbox)
+and the git credentials use the conventional `x-access-token` username
+with the token as the password; if no identity is resolvable the original
+API error is re-raised.
 
 > **To avoid polluting the open-source community, never send pull requests
 > to upstream repositories** — a forked copy is a disguise container, not a

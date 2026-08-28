@@ -1,6 +1,6 @@
 [project]
 name = "mycelium"
-version = "0.3.0"
+version = "0.5.0"
 description = "A realization of distribution of encrypted feeds."
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.12"
@@ -11,6 +11,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
+    "dulwich>=1.2.13",
     "protobuf-py>=0.2.0",
     "pycryptodome>=3.23.0",
     "requests>=2.34.2",

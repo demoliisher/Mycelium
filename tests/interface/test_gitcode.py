@@ -394,12 +394,19 @@ class TestPush(unittest.TestCase):
         self.assertEqual(result["commit"]["sha"], "ok")
 
     def test_push_does_not_retry_other_errors(self):
-        """Only the fork-materialization race is retried; anything else raises."""
+        """Only the fork-materialization race is retried; anything else raises.
+
+        The git-push backup mode is attempted on a non-race failure; when
+        the identity is unresolvable (here: profile fetch 403) the original
+        API error is re-raised.
+        """
         client = make_client()
         calls = []
 
         def handler(method, endpoint, **kwargs):
             calls.append((method, endpoint))
+            if method == "GET" and endpoint == "/user":
+                return _Resp(403, {})  # backup identity unresolvable
             if method == "GET" and endpoint.endswith("/contents/feed.dat"):
                 return _Resp(404, {})
             if method == "POST" and endpoint.endswith("/contents/feed.dat"):
@@ -417,6 +424,99 @@ class TestPush(unittest.TestCase):
 
         posts = [c for c in calls if c[0] == "POST"]
         self.assertEqual(len(posts), 1)  # no retry for non-race errors
+
+
+class TestGitBackup(unittest.TestCase):
+    """The git-push backup mode: identity resolution and the fallback path."""
+
+    def test_identity_from_profile(self):
+        client = make_client()
+        client._request = mock.Mock(
+            return_value=_Resp(200, {"login": "rainbow", "email": "me@x"})
+        )
+        self.assertEqual(client._git_identity(), ("rainbow", "me@x"))
+
+    def test_identity_no_email_returns_none(self):
+        client = make_client()
+        client._request = mock.Mock(return_value=_Resp(200, {"login": "rainbow"}))
+        self.assertIsNone(client._git_identity())
+
+    def test_identity_profile_403_returns_none(self):
+        client = make_client()
+        client._request = mock.Mock(
+            side_effect=requests.exceptions.HTTPError("403")
+        )
+        self.assertIsNone(client._git_identity())
+
+    def test_remote_uses_selected_host(self):
+        client = make_client()
+        self.assertEqual(
+            client._git_remote(),
+            ("https://gitcode.com/rainbow/my-feed", "rainbow", "t"),
+        )
+        atomgit = make_client(host="atomgit.com")
+        self.assertEqual(
+            atomgit._git_remote(),
+            ("https://atomgit.com/rainbow/my-feed", "rainbow", "t"),
+        )
+
+    def test_push_falls_back_when_api_write_fails(self):
+        """A non-race API failure with a resolvable identity -> git-push backup."""
+        client = make_client()
+        calls = []
+
+        def handler(method, endpoint, **kwargs):
+            calls.append((method, endpoint, kwargs))
+            if method == "GET" and endpoint == "/user":
+                return _Resp(200, {"login": "rainbow", "email": "me@x"})
+            if method == "GET" and endpoint.endswith("/contents/feed.dat"):
+                return _Resp(404, {})  # missing file
+            if method == "POST" and endpoint.endswith("/contents/feed.dat"):
+                return _Resp(500, {})
+            raise AssertionError(f"unexpected call: {method} {endpoint}")
+
+        attach(client, handler)
+        with mock.patch(
+            "mycelium.interface.sower.base.GitPusher"
+        ) as pusher_cls, mock.patch(
+            "mycelium.interface.sower.gitcode.time.sleep"
+        ):
+            pusher = pusher_cls.return_value
+            pusher.push_file.return_value = {"commit": {"sha": "g"}}
+            result = client.push("feed.dat", b"x")
+
+        self.assertEqual(result["commit"]["sha"], "g")
+        pusher_cls.assert_called_once_with(
+            "https://gitcode.com/rainbow/my-feed", "rainbow", "t", timeout=300.0
+        )
+        pusher.push_file.assert_called_once_with(
+            "main", "feed.dat", b"x", "Create file feed.dat", "rainbow", "me@x"
+        )
+
+    def test_push_no_backup_when_identity_unresolvable(self):
+        """No identity (profile 403) -> the original API error propagates."""
+        client = make_client()
+        calls = []
+
+        def handler(method, endpoint, **kwargs):
+            calls.append((method, endpoint, kwargs))
+            if method == "GET" and endpoint == "/user":
+                return _Resp(403, {})
+            if method == "GET" and endpoint.endswith("/contents/feed.dat"):
+                return _Resp(404, {})
+            if method == "POST" and endpoint.endswith("/contents/feed.dat"):
+                return _Resp(500, {})
+            raise AssertionError(f"unexpected call: {method} {endpoint}")
+
+        attach(client, handler)
+        with mock.patch(
+            "mycelium.interface.sower.base.GitPusher"
+        ) as pusher_cls, mock.patch(
+            "mycelium.interface.sower.gitcode.time.sleep"
+        ):
+            with self.assertRaises(requests.exceptions.HTTPError):
+                client.push("feed.dat", b"x")
+        pusher_cls.assert_not_called()
 
 
 if __name__ == "__main__":

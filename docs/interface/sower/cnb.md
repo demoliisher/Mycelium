@@ -19,12 +19,12 @@ platform-shaped differences:
   the shared contract, which resolves the namespace from `GET /user`
   everywhere else (the profile call still runs on first use to validate
   the token and, without `group`, to learn the username).
-- **No contents write API** — `push` writes with a real `git push`: the
-  module clones the repository into a temporary directory, overwrites the
-  file, commits and pushes (username `cnb`, the access token as the
-  password, handed to git through a temporary credential store that is
-  deleted right after). The `_write_file` contract hook has no HTTP
-  counterpart on CNB and raises.
+- **No contents write API** — `push` writes with a real `git push` through
+  the pure-Python [git push backend](git.md) (`GitPusher`, dulwich-based):
+  the commit is built in memory and pushed over the git smart HTTP protocol
+  (username `cnb`, the access token as the password) — no `git` executable,
+  no clone, no working tree, no temporary credential store. The
+  `_write_file` contract hook has no HTTP counterpart on CNB and raises.
 - **No fork API** — `fork` mode is accepted (the target name is parsed like
   on the other platforms) but **always raises** when used, with a hint to
   fork the repository manually on the CNB web UI.

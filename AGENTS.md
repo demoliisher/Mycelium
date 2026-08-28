@@ -77,7 +77,16 @@ is the abstract git-hosting contract — a pure abstract class, every method
 a `pass` placeholder and `push` inherited abstract from `Storage`; each
 platform module `sower/gitee.py`, `sower/gitcode.py`,
 `sower/github.py`, `sower/cnb.py` implements the full lifecycle
-itself), the picker is pull-only (`picker/hypha.py`). The namespace is
+itself), the picker is pull-only (`picker/hypha.py`). The git write path
+is `sower/git.py`: `GitPusher` builds the commit in memory (blob → tree →
+commit) and pushes over the git smart HTTP protocol with dulwich — **no
+`git` executable, no clone, no working tree, no credential store**. CNB's
+`push` (its only write path) uses it; Gitee/GitCode/GitHub have an
+optional **backup mode** (`_git_identity` / `_git_remote` hooks in
+`base.py`, shared `_push_git_backup`) that falls back to a real git push
+when the contents write fails after the transient-race retries — the
+commit identity always comes from the platform API, never from local
+`git config`. The namespace is
 taken from `GET /user` on every platform **except CNB** (whose namespace
 is the organization path — the caller's `group`, or the profile username
 when omitted, reusing an existing empty organization if available — CNB
@@ -131,9 +140,11 @@ table alignment tool) live outside the package.
   docs use corner quotes 「」 (『』 for nesting).
 - Release workflow: semantic versioning + Conventional Commits; changelog
   updates (`examples/eg_changelog.py` entries + the README "Changelog"
-  section) precede any push. Pushing requires explicit user approval:
-  before every push, propose a version bump and a summary commit message
-  covering all unpushed commits for review.
+  section) precede any push. Each release lands as a single squashed
+  commit whose title starts with the version (`v0.5.0: …`), with the
+  detailed change notes in the commit body. Pushing requires explicit
+  user approval: before every push, propose a version bump and a summary
+  commit message covering all unpushed commits for review.
 - Ecosystem naming: the feed message is a *sclerotium*
   (`protocol.Sclerotium`) growing on the hosting platform (*soil*), and
   each of its entries is a *fruit* (`protocol.Fruit`); the sclerotium
@@ -190,8 +201,10 @@ table alignment tool) live outside the package.
   exists, else an existing empty org is reused (`GET /user/groups`,
   `account-engage` scope), else a username-named org is auto-created;
   root-org creation is yearly-quota-limited (web and API alike), HTTP 429), the feed blob is
-  written with a real `git push` (username `cnb`, token as password,
-  temporary credential store), and `fork` mode raises with a manual-fork
+  written with a real `git push` through `GitPusher` (`sower/git.py`,
+  dulwich-based, in-memory — no `git` executable, no clone, no working
+  tree, no credential store; username `cnb`, token as password), and
+  `fork` mode raises with a manual-fork
   hint. The API authenticates with `Authorization: Bearer` and the raw
   endpoint requires the token even for public repositories (pickers need
   an authenticated session). OpenAPI deletion of root-org resources is

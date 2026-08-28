@@ -5,7 +5,7 @@
 CNB（cnb.cool）是腾讯云的云原生代码托管平台。`CnbClient` 为 CNB 仓库复刻了 `GiteeClient`，有三个平台性差异：
 
 - **仓库只能存在于「组织」下**（组织）。CNB 没有个人仓库概念，因此构造函数需要传入组织路径（`group`），缺失时自动创建；`group` 也可省略——此时按资料用户名解析组织：username 同名组织已存在则使用；否则复用已有**空组织**（尚无仓库的组织；组织列表来自 `GET /user/groups`，需要 `account-engage` 权限，缺该权限则跳过搜索）；否则自动创建 username 同名组织。`namespace` 因此是组织路径而非资料登录名——这是对共享契约的唯一偏离（其他平台都从 `GET /user` 解析命名空间；首次使用仍会调用资料接口以尽早校验令牌、并在省略 `group` 时取得用户名）。
-- **没有 contents 写入 API** —— `push` 用真实的 `git push` 写入：模块把仓库克隆到临时目录，覆写文件后提交并推送（用户名为 `cnb`，访问令牌作密码，经临时凭据存储文件交给 git，用完即删）。契约钩子 `_write_file` 在 CNB 上没有对应的 HTTP 端点，直接抛错。
+- **没有 contents 写入 API** —— `push` 用真实的 `git push` 写入：经由纯 Python 的 [git 推送后端](git_zh-Hans.md)（`GitPusher`，基于 dulwich）在内存中构造提交并走 git smart HTTP 协议推送（用户名为 `cnb`，访问令牌作密码）——无需 git 可执行文件、无需 clone、无工作树、无临时凭据存储文件。契约钩子 `_write_file` 在 CNB 上没有对应的 HTTP 端点，直接抛错。
 - **没有 fork API** —— `fork` 模式仍可传入（目标名与其他平台一样解析），但**一旦使用必然抛错**，并提示到 CNB 网页手动 fork。
 
 其余功能与 `GiteeClient` 对齐：

@@ -10,7 +10,7 @@ GitCode 与 AtomGit 是**同一个平台的两个名字**：两个域名上的 A
 - 个人空间 `namespace` 由 `GET /user` 解析——**没有 `owner` 参数**；
 - **暂不支持其他平台**（GitHub、Gitee……）——这类 fork 链接会被拒绝，并提示到 GitCode 网页手动导入。
 
-平台差异：GitCode 的 contents API 对缺失文件返回 **HTTP 404**（Gitee 返回空列表），默认分支为 `main`。
+平台差异：GitCode 的 contents API 对缺失文件返回 **HTTP 404**（Gitee 返回空列表），默认分支为 `main`。当 contents 写入在瞬时竞态重试后仍失败时，`push` 回退到经纯 Python 的 [git 推送后端](git_zh-Hans.md)（`GitPusher`）执行**真实 git push**——提交身份取自 GitCode 资料（登录名 + 资料邮箱），git 凭据为登录名 + 访问令牌作密码；若无法解析身份，则重新抛出原始 API 错误。
 
 > **为避免污染开源社区，请勿向上游仓库提交 PR**——复刻副本是伪装容器，不是贡献。
 

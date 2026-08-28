@@ -14,7 +14,7 @@ The feed's mycelium link — ``ChangeLog.dat`` lives at
 ``examples/ChangeLog.dat`` in this repository (demoliisher/Mycelium on
 GitHub) — hardcoded here in comment form:
 
-    # mycelium://8pFEkFBqrQWgw6IzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPwwzK1DEByGpqtRpmmDIBqbvcx9uoWx9M9zqkiN8rRSSmnZ2BHEozf2enAagKTNG=
+    # mycelium://8pFEkFBqrQWgw6OzVDA5Lu4fxHvoGGUG69vzvLNoFS7rXjXDwPnqqYhvNs25PNcAexQPwwzK1DEByGpqtRpmmD+Bqbvcx9uoWx9M9zqkiN8rRSSmnZ2BHEozf2enAagKTNG=
 
 This script doubles as a usage example of ``mycelium.crypto`` and
 ``mycelium.protocol``.
@@ -31,6 +31,15 @@ from mycelium.protocol import Sclerotium, Spore
 # Changelog entries, in order: (semantic version, entry text). Append new
 # ones here; entries already present are skipped on subsequent runs.
 entries = [
+    (
+        "0.5.0",
+        "The git write path no longer needs a git executable: GitPusher "
+        "(sower/git.py, dulwich-based) builds the commit in memory and "
+        "pushes over the git smart HTTP protocol — no clone, no working "
+        "tree, no credential store; CNB's push uses it, and "
+        "Gitee/GitCode/GitHub gain an optional git-push backup mode when "
+        "the contents API write fails",
+    ),
     (
         "0.4.0",
         "CNB module: the commit identity now comes from the platform API "

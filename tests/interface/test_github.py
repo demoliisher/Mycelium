@@ -459,12 +459,19 @@ class TestPush(unittest.TestCase):
         self.assertEqual(len([c for c in calls if c[0] == "PUT"]), 2)
 
     def test_push_non_race_error_propagates(self):
-        """A 422 that does not mention the repository must propagate without retry."""
+        """A 422 that does not mention the repository must propagate without retry.
+
+        The git-push backup mode is attempted on a non-race failure; when
+        the identity is unresolvable (here: profile fetch 403) the original
+        API error is re-raised.
+        """
         client = make_client()
         calls = []
 
         def handler(method, endpoint, **kwargs):
             calls.append((method, endpoint, kwargs))
+            if method == "GET" and endpoint == "/user":
+                return _Resp(403, {})  # backup identity unresolvable
             if method == "GET" and endpoint.endswith("/contents/feed.dat"):
                 return _Resp(404, {})
             if method == "PUT" and endpoint.endswith("/contents/feed.dat"):
@@ -525,6 +532,124 @@ class TestSporeLink(unittest.TestCase):
         spore = parse_spore(link)
         self.assertEqual(spore.host, "mirror.example.com")
         self.assertEqual(spore.path, "rainbow/my-feed/main/feed.dat")
+
+
+class TestGitBackup(unittest.TestCase):
+    """The git-push backup mode: identity resolution and the fallback path."""
+
+    def _client(self, profile, emails=None, emails_status=200):
+        client = make_client()
+        calls = []
+
+        def handler(method, endpoint, **kwargs):
+            calls.append((method, endpoint))
+            if method == "GET" and endpoint == "/user":
+                return _Resp(200, profile)
+            if method == "GET" and endpoint == "/user/emails":
+                return _Resp(emails_status, emails if emails is not None else {})
+            raise AssertionError(f"unexpected call: {method} {endpoint}")
+
+        attach(client, handler)
+        client._calls = calls
+        return client
+
+    def test_identity_profile_email_wins(self):
+        client = self._client({"login": "rainbow", "email": "me@x"})
+        self.assertEqual(client._git_identity(), ("rainbow", "me@x"))
+        self.assertNotIn(("GET", "/user/emails"), client._calls)
+
+    def test_identity_primary_email_from_emails_endpoint(self):
+        client = self._client(
+            {"login": "rainbow", "email": ""},
+            [{"email": "a@x", "primary": False}, {"email": "b@x", "primary": True}],
+        )
+        self.assertEqual(client._git_identity(), ("rainbow", "b@x"))
+
+    def test_identity_noreply_fallback(self):
+        client = self._client({"login": "rainbow", "id": 42}, emails_status=403)
+        self.assertEqual(
+            client._git_identity(),
+            ("rainbow", "42+rainbow@users.noreply.github.com"),
+        )
+
+    def test_identity_profile_403_returns_none(self):
+        client = make_client()
+        client._request = mock.Mock(
+            side_effect=requests.exceptions.HTTPError("403")
+        )
+        self.assertIsNone(client._git_identity())
+
+    def test_identity_no_login_returns_none(self):
+        client = self._client({"email": "x"})
+        self.assertIsNone(client._git_identity())
+
+    def test_remote_uses_x_access_token(self):
+        client = make_client()
+        self.assertEqual(
+            client._git_remote(),
+            ("https://github.com/rainbow/my-feed", "x-access-token", "t"),
+        )
+
+    def test_push_falls_back_when_api_write_fails(self):
+        """A non-race API failure with a resolvable identity -> git-push backup."""
+        client = make_client()
+        calls = []
+
+        def handler(method, endpoint, **kwargs):
+            calls.append((method, endpoint, kwargs))
+            if method == "GET" and endpoint == "/user":
+                return _Resp(200, {"login": "rainbow", "email": "me@x"})
+            if method == "GET" and endpoint.endswith("/contents/feed.dat"):
+                return _Resp(404, {})
+            if method == "PUT" and endpoint.endswith("/contents/feed.dat"):
+                return _Resp(500, {})
+            raise AssertionError(f"unexpected call: {method} {endpoint}")
+
+        attach(client, handler)
+        with mock.patch(
+            "mycelium.interface.sower.base.GitPusher"
+        ) as pusher_cls, mock.patch(
+            "mycelium.interface.sower.github.time.sleep"
+        ):
+            pusher = pusher_cls.return_value
+            pusher.push_file.return_value = {"commit": {"sha": "g"}}
+            result = client.push("feed.dat", b"x")
+
+        self.assertEqual(result["commit"]["sha"], "g")
+        pusher_cls.assert_called_once_with(
+            "https://github.com/rainbow/my-feed",
+            "x-access-token",
+            "t",
+            timeout=300.0,
+        )
+        pusher.push_file.assert_called_once_with(
+            "main", "feed.dat", b"x", "Create file feed.dat", "rainbow", "me@x"
+        )
+
+    def test_push_no_backup_when_identity_unresolvable(self):
+        """No identity (profile 403) -> the original API error propagates."""
+        client = make_client()
+        calls = []
+
+        def handler(method, endpoint, **kwargs):
+            calls.append((method, endpoint, kwargs))
+            if method == "GET" and endpoint == "/user":
+                return _Resp(403, {})
+            if method == "GET" and endpoint.endswith("/contents/feed.dat"):
+                return _Resp(404, {})
+            if method == "PUT" and endpoint.endswith("/contents/feed.dat"):
+                return _Resp(500, {})
+            raise AssertionError(f"unexpected call: {method} {endpoint}")
+
+        attach(client, handler)
+        with mock.patch(
+            "mycelium.interface.sower.base.GitPusher"
+        ) as pusher_cls, mock.patch(
+            "mycelium.interface.sower.github.time.sleep"
+        ):
+            with self.assertRaises(requests.exceptions.HTTPError):
+                client.push("feed.dat", b"x")
+        pusher_cls.assert_not_called()
 
 
 if __name__ == "__main__":

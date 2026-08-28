@@ -14,7 +14,7 @@
 - 账户登录名（`namespace`）由 `GET /user` 解析——**没有 `owner` 参数**；
 - **暂不支持其他平台**（Gitee、GitCode……）——这类 fork 链接会被拒绝，并提示到 GitHub 网页手动导入。
 
-平台差异：GitHub 的 contents API 对缺失文件返回 **HTTP 404**；fork 是异步落地的——复刻后立即写入可能短暂报 409/422，`push` 会短暂重试。
+平台差异：GitHub 的 contents API 对缺失文件返回 **HTTP 404**；fork 是异步落地的——复刻后立即写入可能短暂报 409/422，`push` 会短暂重试。当 contents 写入在瞬时竞态重试后仍失败时，`push` 回退到经纯 Python 的 [git 推送后端](git_zh-Hans.md)（`GitPusher`）执行**真实 git push**——提交身份取自 GitHub 资料（登录名 + 资料邮箱，缺省时取 `GET /user/emails` 的主邮箱，再缺省时用 GitHub 的匿名 `users.noreply.github.com` 邮箱），git 凭据使用惯用的 `x-access-token` 用户名 + 令牌作密码；若无法解析身份，则重新抛出原始 API 错误。
 
 > **为避免污染开源社区，请勿向上游仓库提交 PR**——复刻副本是伪装容器，不是贡献。
 

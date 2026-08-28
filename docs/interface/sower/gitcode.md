@@ -20,7 +20,12 @@ source URLs). Its feature set mirrors `GiteeClient`:
 
 Platform quirks: the GitCode contents API replies **HTTP 404** for a
 missing file (Gitee returns an empty list instead), and the default branch
-is `main`.
+is `main`. When the contents write fails after the transient-race retries,
+`push` falls back to a **real git push** through the pure-Python
+[git push backend](git.md) (`GitPusher`) — the commit identity comes from
+the GitCode profile (login + profile email) and the git credentials are
+the login with the access token as the password; if no identity is
+resolvable the original API error is re-raised.
 
 > **To avoid polluting the open-source community, never send pull requests
 > to upstream repositories** — a forked copy is a disguise container, not a

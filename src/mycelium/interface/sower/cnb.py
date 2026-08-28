@@ -22,11 +22,13 @@ module:
   ``GET /user`` everywhere else (CNB still calls ``GET /user``: to
   validate the token early and, without ``group``, to learn the username).
 - **There is no contents write API.** ``push`` writes the blob with a real
-  ``git push``: the module clones the repository into a temporary directory,
-  overwrites the file, commits and pushes (username ``cnb``, the access
-  token as the password — this is what the ``repo-code`` scope's "Git
-  client credentials" grants). The ``_write_file`` contract hook therefore
-  has no HTTP counterpart on CNB and raises.
+  ``git push`` through ``mycelium.interface.sower.git.GitPusher`` — a
+  pure-Python push (dulwich) that builds the commit in memory: no ``git``
+  executable, no clone, no working tree, no temporary credential store.
+  The git credentials are the fixed username ``cnb`` with the access token
+  as the password — this is what the ``repo-code`` scope's "Git client
+  credentials" grants. The ``_write_file`` contract hook therefore has no
+  HTTP counterpart on CNB and raises.
 - **There is no fork API.** The ``fork`` constructor argument is accepted
   (the target name is parsed like on the other platforms) but any attempt
   to use it raises with a hint to fork the repository manually on the CNB
@@ -60,16 +62,13 @@ contribution.
 The access token is **not** embedded in this module; it is always passed
 explicitly as the ``access_token`` constructor argument (or ``sys.argv[1]``
 in the ``__main__`` demo). It acts as the git password during ``push`` and
-is handed to git through a temporary credential store that is deleted right
-after the push — it never appears in a URL or on the command line.
+is handed to ``GitPusher`` in memory — it never appears in a URL, on the
+command line, or on disk.
 """
 
 from __future__ import annotations
 
-import os
-import subprocess
 import sys
-import tempfile
 import time
 from urllib.parse import quote
 
@@ -78,6 +77,7 @@ import requests
 from mycelium.protocol import Spore
 
 from .base import GitPlatformClient
+from .git import GIT_ERRORS, GIT_PUSH_TIMEOUT, GitPusher, is_transient_git_error
 
 __all__ = ["CnbClient"]
 
@@ -85,8 +85,8 @@ __all__ = ["CnbClient"]
 # access token as the password (see docs.cnb.cool/guide/access-token).
 _GIT_USERNAME = "cnb"
 
-# A push can take a while on slow links; bound every git subprocess call.
-_GIT_TIMEOUT = 300.0
+# Bound every git network call (see git.py).
+_GIT_TIMEOUT = GIT_PUSH_TIMEOUT
 
 
 class CnbClient(GitPlatformClient):
@@ -535,11 +535,12 @@ class CnbClient(GitPlatformClient):
         """
         Create or update a file with a real git push; return a summary dict.
 
-        CNB has no contents write API: the blob is committed in a temporary
-        clone of the repository and pushed to the configured branch (the
-        access token acts as the git password, username ``cnb``). Pushing to
-        a just-created repository can transiently fail while the branch is
-        still being initialized; such errors are retried briefly.
+        CNB has no contents write API: the blob is committed in memory and
+        pushed with ``GitPusher`` (dulwich, no ``git`` executable) to the
+        configured branch (the access token acts as the git password,
+        username ``cnb``). Pushing to a just-created repository can
+        transiently fail while the server-side branch is still being
+        initialized; such errors are retried briefly.
         """
         endpoint = self._contents_endpoint(file_path)
         sha = self._existing_sha(endpoint)
@@ -550,7 +551,7 @@ class CnbClient(GitPlatformClient):
         for attempt in range(self._WRITE_RETRIES):
             try:
                 return self._push_once(file_path, content_bytes, commit_message)
-            except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+            except GIT_ERRORS as e:
                 if attempt + 1 < self._WRITE_RETRIES and self._is_transient(e):
                     time.sleep(self._WRITE_BACKOFF * (attempt + 1))
                     continue
@@ -560,69 +561,23 @@ class CnbClient(GitPlatformClient):
     def _push_once(
         self, file_path: str, content_bytes: bytes, commit_message: str
     ) -> dict:
-        """Clone the target, overwrite ``file_path``, commit and push."""
+        """Build the commit in memory and push it (username ``cnb``, token as password)."""
         self._resolve_group()
         git_name, git_email = self._git_identity()
         remote = f"https://cnb.cool/{self.group}/{self.repo}"
-        cred = self._write_credential_file()
-        try:
-            with tempfile.TemporaryDirectory(prefix="mycelium-cnb-") as workdir:
-                self._git(cred, "clone", remote, workdir)
-                # A fresh clone sits on the remote default branch (unborn for
-                # an empty repository); move onto the target branch.
-                current = self._git(
-                    cred, "branch", "--show-current", cwd=workdir
-                ).stdout.strip()
-                if current != self.branch:
-                    try:
-                        self._git(cred, "checkout", self.branch, cwd=workdir)
-                    except subprocess.CalledProcessError:
-                        self._git(cred, "checkout", "-b", self.branch, cwd=workdir)
-                self._git(cred, "config", "user.name", git_name, cwd=workdir)
-                self._git(cred, "config", "user.email", git_email, cwd=workdir)
-                target = os.path.join(workdir, file_path)
-                parent = os.path.dirname(target)
-                if parent:
-                    os.makedirs(parent, exist_ok=True)
-                with open(target, "wb") as f:
-                    f.write(content_bytes)
-                self._git(cred, "add", "-A", cwd=workdir)
-                self._git(cred, "commit", "-m", commit_message, cwd=workdir)
-                self._git(cred, "push", remote, f"HEAD:{self.branch}", cwd=workdir)
-                head = self._git(cred, "rev-parse", "HEAD", cwd=workdir).stdout.strip()
-        finally:
-            os.unlink(cred)
-        return {"commit": {"sha": head}, "message": commit_message}
-
-    def _write_credential_file(self) -> str:
-        """Write a temporary git credential store for the CNB remote."""
-        fd, path = tempfile.mkstemp(prefix="mycelium-cnb-cred-", text=True)
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(f"https://{_GIT_USERNAME}:{self.access_token}@cnb.cool\n")
-        return path
-
-    def _git(
-        self, cred: str, *args: str, cwd: str | None = None
-    ) -> subprocess.CompletedProcess:
-        """Run ``git`` with the CNB credential store; raise on failure.
-
-        The store file path is passed with forward slashes (git mangles
-        backslashes in helper arguments), Git Credential Manager is forced
-        non-interactive and terminal prompts are disabled, so the token
-        comes only from the temporary store.
-        """
-        helper = f"store --file={cred.replace(os.sep, '/')}"
-        env = os.environ.copy()
-        env["GCM_INTERACTIVE"] = "never"
-        env["GIT_TERMINAL_PROMPT"] = "0"
-        return subprocess.run(
-            ["git", "-c", f"credential.helper={helper}", *args],
-            cwd=cwd,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=True,
+        pusher = GitPusher(
+            remote,
+            _GIT_USERNAME,
+            self.access_token,
             timeout=_GIT_TIMEOUT,
+        )
+        return pusher.push_file(
+            self.branch,
+            file_path,
+            content_bytes,
+            commit_message,
+            git_name,
+            git_email,
         )
 
     def _write_file(
@@ -638,23 +593,9 @@ class CnbClient(GitPlatformClient):
         """False: CNB has no fork API, and ``push`` retries git failures itself."""
         return False
 
-    def _is_transient(self, exc: Exception) -> bool:
+    def _is_transient(self, exc: GIT_ERRORS) -> bool:
         """True if a git failure looks like the transient fresh-repo race."""
-        if isinstance(exc, subprocess.TimeoutExpired):
-            return True
-        if isinstance(exc, subprocess.CalledProcessError):
-            stderr = (exc.stderr or "").lower()
-            return any(
-                marker in stderr
-                for marker in (
-                    "not found",
-                    "empty",
-                    "initializ",
-                    "cannot lock",
-                    "could not read from remote",
-                )
-            )
-        return False
+        return is_transient_git_error(exc)
 
     def _existing_sha(self, endpoint: str) -> str | None:
         """Return the file's current sha, or None if the file does not exist.

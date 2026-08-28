@@ -13,7 +13,7 @@
 
 > **为避免污染开源社区，请勿向上游仓库提交 PR**——复刻副本是伪装容器，不是贡献。
 
-- **推送** — `push(path, data, commit_message=...)` 通过 contents API 创建或更新文件：POST 创建（无需 sha），PUT 更新（需当前 blob sha）。
+- **推送** — `push(path, data, commit_message=...)` 通过 contents API 创建或更新文件：POST 创建（无需 sha），PUT 更新（需当前 blob sha）。当 contents 写入在瞬时竞态重试后仍失败时，`push` 回退到经纯 Python 的 [git 推送后端](git_zh-Hans.md)（`GitPusher`）执行**真实 git push**——提交身份取自 Gitee 资料（登录名 + 资料邮箱），git 凭据为登录名 + 访问令牌作密码；若无法解析身份，则重新抛出原始 API 错误。
 
 访问令牌从不写死在模块里，始终通过构造参数 `access_token` 显式传入。
 

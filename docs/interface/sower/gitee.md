@@ -27,7 +27,12 @@ rejected with a hint to import the repository manually on the Gitee web UI.
 
 - **Push** — `push(path, data, commit_message=...)` creates or updates a
   file through the contents API: POST to create (no sha), PUT to update
-  (current blob sha required).
+  (current blob sha required). When the contents write fails after the
+  transient-race retries, `push` falls back to a **real git push** through
+  the pure-Python [git push backend](git.md) (`GitPusher`) — the commit
+  identity comes from the Gitee profile (login + profile email) and the
+  git credentials are the login with the access token as the password; if
+  no identity is resolvable the original API error is re-raised.
 
 The access token is never embedded in the module; it is always passed
 explicitly as the `access_token` constructor argument.

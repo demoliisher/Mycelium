@@ -24,6 +24,8 @@ from __future__ import annotations
 import requests
 from abc import ABC, abstractmethod
 
+from .git import GIT_PUSH_TIMEOUT, GitPusher
+
 __all__ = ["Storage", "GitPlatformClient"]
 
 
@@ -179,6 +181,58 @@ class GitPlatformClient(Storage):
         directory.
         """
         pass
+
+    # ---------- optional git-push backup mode ----------
+
+    def _git_identity(self) -> tuple[str, str] | None:
+        """
+        The (name, email) commit identity for the git-push backup mode.
+
+        Resolved from the platform API (the authorized user's profile and,
+        where the platform provides one, its git commit email). Returns
+        None when the platform has no backup mode or no identity can be
+        resolved — the caller then re-raises the original API error.
+        """
+        return None
+
+    def _git_remote(self) -> tuple[str, str, str] | None:
+        """
+        The (url, username, password) git remote for the backup push.
+
+        Returns None when the platform has no backup mode. The url is the
+        HTTPS clone/push URL of the target repository; username/password
+        are the git credentials (e.g. ``cnb`` + the access token on CNB).
+        """
+        return None
+
+    def _push_git_backup(
+        self, file_path: str, content_bytes: bytes, commit_message: str
+    ) -> dict | None:
+        """
+        Write ``file_path`` with a real git push (backup mode), or None.
+
+        Platforms without a backup mode keep ``_git_identity`` /
+        ``_git_remote`` at None, so this returns None and the caller
+        re-raises the API write error. Platforms with a backup mode
+        override those two hooks; this method builds the ``GitPusher``
+        and pushes — the commit identity comes from the platform API, not
+        from the user's local ``git config``.
+        """
+        identity = self._git_identity()
+        remote = self._git_remote()
+        if identity is None or remote is None:
+            return None
+        name, email = identity
+        url, username, password = remote
+        pusher = GitPusher(url, username, password, timeout=GIT_PUSH_TIMEOUT)
+        return pusher.push_file(
+            self.branch,
+            file_path,
+            content_bytes,
+            commit_message,
+            name,
+            email,
+        )
 
     # ``push`` is deliberately not redefined here: it stays abstract from
     # ``Storage``, which keeps this class abstract.

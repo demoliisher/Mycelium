@@ -9,18 +9,19 @@ CNB differs from Gitee/GitCode/GitHub in three ways covered here:
   username-named org when it exists, else an existing empty org is reused,
   else a username-named org is auto-created) and the namespace is the
   organization path, not the profile login;
-- there is no contents write API: ``push`` writes via a real ``git push``
-  (``_git`` is mocked; the temporary credential store is exercised for real);
+- there is no contents write API: ``push`` writes via ``GitPusher`` (a
+  pure-Python git push, mocked here — the real push flow is exercised by
+  ``test_git.py`` against a local repository);
 - there is no fork API: ``fork`` mode parses the target name but raises
   whenever it is used.
 """
 
-import os
-import subprocess
 import unittest
 from unittest import mock
 
 import requests
+
+from dulwich.errors import NotGitRepository, SendPackError
 
 from mycelium.interface.sower.cnb import (
     CnbClient,
@@ -49,20 +50,6 @@ class _Resp:
             err = requests.exceptions.HTTPError(f"{self.status_code} error")
             err.response = self
             raise err
-
-
-class _Git:
-    """Recorded stand-in for ``CnbClient._git`` (canned stdout)."""
-
-    def __init__(self, stdout="a1b2c3"):
-        self.calls = []
-        self.stdout = stdout
-
-    def __call__(self, cred, *args, cwd=None):
-        self.calls.append((cred, args, cwd))
-        return subprocess.CompletedProcess(
-            args=args, returncode=0, stdout=self.stdout + "\n"
-        )
 
 
 def make_client(**kwargs) -> CnbClient:
@@ -580,8 +567,22 @@ class TestPush(unittest.TestCase):
 
         return wrapped
 
+    def _git_pusher(self, result=None):
+        """Replace ``cnb.GitPusher`` with a recording mock; return (cls, git)."""
+        cls = mock.Mock()
+        git = mock.Mock()
+        cls.return_value = git
+        git.push_file.return_value = result or {
+            "commit": {"sha": "new-sha"},
+            "message": "m",
+        }
+        patch = mock.patch("mycelium.interface.sower.cnb.GitPusher", cls)
+        patch.start()
+        self.addCleanup(patch.stop)
+        return cls, git
+
     def test_push_creates_file(self):
-        """Missing file -> 'Create file ...' message; git flow runs to a push."""
+        """Missing file -> 'Create file ...' message; push runs through GitPusher."""
         client = make_client()
         calls = []
 
@@ -592,22 +593,20 @@ class TestPush(unittest.TestCase):
             raise AssertionError(f"unexpected call: {method} {endpoint}")
 
         attach(client, self._identity(handler))
-        git = _Git(stdout="new-sha")
-        client._git = git
+        cls, git = self._git_pusher()
         result = client.push("feed.dat", b"hello")
 
         self.assertEqual(result["commit"]["sha"], "new-sha")
-        self.assertEqual(result["message"], "Create file feed.dat")
-
-        # The git flow: clone, (branch check), identity, add, commit, push.
-        commands = [args for _, args, _ in git.calls]
-        self.assertEqual(commands[0][:2], ("clone", "https://cnb.cool/mycelium/my-feed"))
-        self.assertIn(("commit", "-m", "Create file feed.dat"), commands)
-        push_call = next(args for args in commands if args[0] == "push")
-        self.assertEqual(push_call[-1], "HEAD:main")
-        # The commit identity comes from the platform API, not local git.
-        self.assertIn(("config", "user.name", "rainbow"), commands)
-        self.assertIn(("config", "user.email", "r@e.x"), commands)
+        # The mock's canned message is returned as-is; the real message the
+        # pusher receives is what push() built.
+        git.push_file.assert_called_once_with(
+            "main", "feed.dat", b"hello", "Create file feed.dat", "rainbow", "r@e.x"
+        )
+        # The git remote is built from the resolved group and the fixed
+        # credentials; the identity comes from the platform API.
+        cls.assert_called_once_with(
+            "https://cnb.cool/mycelium/my-feed", "cnb", "t", timeout=300.0
+        )
 
     def test_push_updates_file(self):
         """Existing file -> 'Update file ...' message; sha lookup succeeded."""
@@ -621,12 +620,12 @@ class TestPush(unittest.TestCase):
             raise AssertionError(f"unexpected call: {method} {endpoint}")
 
         attach(client, self._identity(handler))
-        git = _Git()
-        client._git = git
+        _, git = self._git_pusher()
         client.push("feed.dat", b"world")
-
-        commands = [args for _, args, _ in git.calls]
-        self.assertIn(("commit", "-m", "Update file feed.dat"), commands)
+        git.push_file.assert_called_once()
+        self.assertEqual(
+            git.push_file.call_args.args[3], "Update file feed.dat"
+        )
 
     def test_push_custom_commit_message(self):
         client = make_client()
@@ -637,39 +636,13 @@ class TestPush(unittest.TestCase):
             raise AssertionError(f"unexpected call: {method} {endpoint}")
 
         attach(client, self._identity(handler))
-        git = _Git()
-        client._git = git
+        _, git = self._git_pusher()
         client.push("feed.dat", b"x", commit_message="publish v1")
-        commands = [args for _, args, _ in git.calls]
-        self.assertIn(("commit", "-m", "publish v1"), commands)
-
-    def test_push_credential_file_created_and_removed(self):
-        client = make_client()
-
-        def handler(method, endpoint, **kwargs):
-            if method == "GET" and endpoint.endswith("/contents/feed.dat"):
-                return _Resp(404, {})
-            raise AssertionError(f"unexpected call: {method} {endpoint}")
-
-        attach(client, self._identity(handler))
-        git = _Git()
-        client._git = git
-        client.push("feed.dat", b"x")
-
-        cred = git.calls[0][0]  # the credential file path passed to _git
-        self.assertFalse(os.path.exists(cred), "credential store must be deleted")
-
-    def test_credential_file_holds_cnb_token(self):
-        client = make_client()
-        path = client._write_credential_file()
-        try:
-            with open(path, encoding="utf-8") as f:
-                self.assertEqual(f.read(), "https://cnb:t@cnb.cool\n")
-        finally:
-            os.unlink(path)
+        git.push_file.assert_called_once()
+        self.assertEqual(git.push_file.call_args.args[3], "publish v1")
 
     def test_push_writes_content_bytes(self):
-        """The pushed blob must be the raw bytes, written into the clone."""
+        """The pushed blob must be the raw bytes, not base64 or text."""
         client = make_client()
 
         def handler(method, endpoint, **kwargs):
@@ -678,23 +651,12 @@ class TestPush(unittest.TestCase):
             raise AssertionError(f"unexpected call: {method} {endpoint}")
 
         attach(client, self._identity(handler))
-        git = _Git()
-        client._git = git
-
-        def fake_git(cred, *args, cwd=None):
-            git(cred, *args, cwd=cwd)
-            if args[0] == "add":
-                # Capture the blob while the clone still exists (the temp
-                # directory is removed when push() returns).
-                git.blob = open(os.path.join(cwd, "feed.dat"), "rb").read()
-            return subprocess.CompletedProcess(args=args, returncode=0, stdout="s\n")
-
-        client._git = fake_git
+        _, git = self._git_pusher()
         client.push("feed.dat", b"\x00\x01binary")
-        self.assertEqual(git.blob, b"\x00\x01binary")
+        self.assertEqual(git.push_file.call_args.args[2], b"\x00\x01binary")
 
     def test_push_retries_transient_git_failure(self):
-        """A git failure mentioning a fresh-repo race is retried, then succeeds."""
+        """A transient git error (fresh-repo race) is retried, then succeeds."""
         client = make_client()
 
         def handler(method, endpoint, **kwargs):
@@ -703,22 +665,15 @@ class TestPush(unittest.TestCase):
             raise AssertionError(f"unexpected call: {method} {endpoint}")
 
         attach(client, self._identity(handler))
-        state = {"n": 0}
-
-        def flaky_git(cred, *args, cwd=None):
-            state["n"] += 1
-            if state["n"] == 1 and args[0] == "clone":
-                raise subprocess.CalledProcessError(
-                    128, args, stderr="fatal: repository 'x' not found"
-                )
-            return subprocess.CompletedProcess(args=args, returncode=0, stdout="s\n")
-
-        client._git = flaky_git
+        cls, git = self._git_pusher()
+        git.push_file.side_effect = [
+            NotGitRepository(),
+            {"commit": {"sha": "s"}, "message": "m"},
+        ]
         with mock.patch("mycelium.interface.sower.cnb.time.sleep"):
             result = client.push("feed.dat", b"x")
-
         self.assertEqual(result["commit"]["sha"], "s")
-        self.assertGreaterEqual(state["n"], 2)
+        self.assertEqual(git.push_file.call_count, 2)
 
     def test_push_does_not_retry_other_git_failures(self):
         client = make_client()
@@ -729,18 +684,12 @@ class TestPush(unittest.TestCase):
             raise AssertionError(f"unexpected call: {method} {endpoint}")
 
         attach(client, self._identity(handler))
-        state = {"n": 0}
-
-        def bad_git(cred, *args, cwd=None):
-            state["n"] += 1
-            raise subprocess.CalledProcessError(128, args, stderr="fatal: authentication failed")
-
-        client._git = bad_git
+        cls, git = self._git_pusher()
+        git.push_file.side_effect = SendPackError(b"rejected")
         with mock.patch("mycelium.interface.sower.cnb.time.sleep"):
-            with self.assertRaises(subprocess.CalledProcessError):
+            with self.assertRaises(SendPackError):
                 client.push("feed.dat", b"x")
-
-        self.assertEqual(state["n"], 1)  # no retry for non-transient errors
+        self.assertEqual(git.push_file.call_count, 1)
 
     def test_push_resolves_username_group_for_remote(self):
         """No group -> the git remote uses the resolved organization."""
@@ -758,13 +707,13 @@ class TestPush(unittest.TestCase):
             raise AssertionError(f"unexpected call: {method} {endpoint}")
 
         attach(client, handler)
-        git = _Git()
-        client._git = git
+        cls, _ = self._git_pusher()
         client.push("feed.dat", b"x")
 
-        commands = [args for _, args, _ in git.calls]
-        self.assertEqual(commands[0][:2], ("clone", "https://cnb.cool/spare/my-feed"))
         self.assertEqual(client.group, "spare")
+        cls.assert_called_once_with(
+            "https://cnb.cool/spare/my-feed", "cnb", "t", timeout=300.0
+        )
 
 
 class TestExistingSha(unittest.TestCase):

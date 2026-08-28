@@ -6,10 +6,13 @@ Sower interface: push the encrypted feed blob into a hosting backend.
 ``base`` holds the abstract contracts: ``Storage`` (push-only, shared by
 all platforms) and ``GitPlatformClient`` (the git-hosting lifecycle as a
 pure abstract contract — every method is a ``pass`` placeholder, ``push``
-stays abstract from ``Storage``). Each platform gets its own self-contained
-module implementing the full lifecycle (``gitee``, ``gitcode``, ``github``,
-``cnb`` — other hosts can be added later as siblings, e.g. a plain WebDAV
-server subclassing ``Storage``).
+stays abstract from ``Storage``). ``git`` is the pure-Python git write
+backend (``GitPusher``, dulwich-based, no ``git`` executable): CNB's only
+write path, and the optional backup mode for the contents-API platforms.
+Each platform gets its own self-contained module implementing the full
+lifecycle (``gitee``, ``gitcode``, ``github``, ``cnb`` — other hosts can be
+added later as siblings, e.g. a plain WebDAV server subclassing
+``Storage``).
 """
 
 from .base import GitPlatformClient, Storage
